@@ -1,0 +1,9 @@
+ccxt
+fastapi
+uvicorn
+sqlalchemy
+pandas
+aiohttp
+python-dotenv
+pydantic
+pytest
