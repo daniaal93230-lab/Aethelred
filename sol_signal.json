@@ -1,0 +1,167 @@
+{
+  "generated_at": "2025-09-10T18:03:52.157995+00:00",
+  "exchange": "binance",
+  "symbol": "SOL/USDT",
+  "interval": "15m",
+  "chosen_strategy": "donchian",
+  "signal": "FLAT",
+  "raw_signal": 0,
+  "price": 223.1,
+  "entry_age_bars": 6,
+  "run_ms": 5279,
+  "costs": {
+    "fee": 0.0004,
+    "slip": 0.0001
+  },
+  "folds": [
+    {
+      "start": 1,
+      "end": 450,
+      "regime": "trend",
+      "strategy": "donchian",
+      "exp_train": -0.0006375558591974422,
+      "n_train": 12,
+      "exp_test": -0.0017639118132516112,
+      "n_test": 2,
+      "sharpe_test": -20.666448835429186
+    },
+    {
+      "start": 61,
+      "end": 510,
+      "regime": "trend",
+      "strategy": "donchian",
+      "exp_train": -0.0007627495669194664,
+      "n_train": 14,
+      "exp_test": -0.0005334247762056315,
+      "n_test": 2,
+      "sharpe_test": -23.131608026403185
+    },
+    {
+      "start": 121,
+      "end": 570,
+      "regime": "trend",
+      "strategy": "donchian",
+      "exp_train": -0.0007627495669194663,
+      "n_train": 14,
+      "exp_test": -0.0005334247762056315,
+      "n_test": 2,
+      "sharpe_test": -23.13160802640318
+    },
+    {
+      "start": 181,
+      "end": 630,
+      "regime": "chop",
+      "strategy": "rsi_mr",
+      "exp_train": -0.00017598209645317754,
+      "n_train": 14,
+      "exp_test": 0.000766944807052056,
+      "n_test": 10,
+      "sharpe_test": 13.487820177405087
+    },
+    {
+      "start": 241,
+      "end": 690,
+      "regime": "trend",
+      "strategy": "donchian",
+      "exp_train": -0.0007517795276466159,
+      "n_train": 11,
+      "exp_test": -0.0009709239530659435,
+      "n_test": 2,
+      "sharpe_test": -25.431281553805547
+    },
+    {
+      "start": 301,
+      "end": 750,
+      "regime": "trend",
+      "strategy": null,
+      "exp_train": 0.0,
+      "n_train": 0,
+      "exp_test": 0.0,
+      "n_test": 0,
+      "sharpe_test": 0.0
+    },
+    {
+      "start": 361,
+      "end": 810,
+      "regime": "chop",
+      "strategy": "rsi_mr",
+      "exp_train": 0.0005632016927483697,
+      "n_train": 22,
+      "exp_test": 0.000984304543877907,
+      "n_test": 2,
+      "sharpe_test": 9.873270256283082
+    },
+    {
+      "start": 421,
+      "end": 870,
+      "regime": "trend",
+      "strategy": null,
+      "exp_train": 0.0,
+      "n_train": 0,
+      "exp_test": 0.0,
+      "n_test": 0,
+      "sharpe_test": 0.0
+    },
+    {
+      "start": 481,
+      "end": 930,
+      "regime": "trend",
+      "strategy": "donchian",
+      "exp_train": 0.00228200391265565,
+      "n_train": 10,
+      "exp_test": -0.0017020571543285012,
+      "n_test": 6,
+      "sharpe_test": -18.965942323511065
+    },
+    {
+      "start": 541,
+      "end": 990,
+      "regime": "trend",
+      "strategy": "donchian",
+      "exp_train": 0.0008435714319423861,
+      "n_train": 14,
+      "exp_test": 0.0012335198221269294,
+      "n_test": 6,
+      "sharpe_test": 12.123511454606165
+    }
+  ],
+  "selection_guard": {
+    "passed": true,
+    "reason": "",
+    "best_oos_sharpe": 13.487820177405087,
+    "best_oos_expect": 0.0012335198221269294,
+    "total_oos_trades": 32,
+    "min_oos_sharpe": 0.2,
+    "min_oos_trades": 10,
+    "require_pos_expectancy": true
+  },
+  "ml": {
+    "enabled": false,
+    "p_up": null,
+    "threshold": 0.55,
+    "model": null,
+    "vote": null
+  },
+  "regime_params": {
+    "wf_train": 300,
+    "wf_test": 150,
+    "wf_step": 60,
+    "adx_threshold": 18,
+    "adx_len": 14,
+    "auto_tuned": true
+  },
+  "metrics": {
+    "bars_used": 1000,
+    "ann_return": 0.3691079068456755,
+    "ann_vol": 0.12303392512182533,
+    "sharpe_ann": 2.5534444658530577,
+    "max_drawdown": -0.01846532323460215,
+    "win_rate_bar": 0.4666666666666667,
+    "profit_factor_bar": 1.5041531213100254,
+    "trade_count": 18,
+    "avg_bar_return": 8.96577549067119e-06,
+    "win_rate_trade": 0.8888888888888888,
+    "profit_factor_trade": 112.088755440141
+  },
+  "ml_vote": null
+}

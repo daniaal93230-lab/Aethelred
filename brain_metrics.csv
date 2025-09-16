@@ -1,0 +1,5 @@
+ts,exchange,symbol,interval,strategy,signal,price,bars_used,ann_return,ann_vol,sharpe_ann,max_drawdown,win_rate_bar,profit_factor_bar,trade_count,avg_bar_return,paper_equity
+2025-09-04T15:54:23.868416+00:00,binance,BTC/USDT,15m,none,FLAT,109636.59000000,1000,,,,,,,0,,
+2025-09-09T16:28:31.400776+00:00,binance,BTC/USDT,15m,none,FLAT,110935.25000000,1000,,,,,,,0,,
+2025-09-09T16:29:14.929615+00:00,binance,BTC/USDT,15m,none,FLAT,110920.00000000,1000,,,,,,,0,,
+2025-09-09T16:29:49.095877+00:00,binance,SOL/USDT,15m,rsi_mr,FLAT,213.72000000,1000,-0.56113477,0.19554172,-4.21164570,-0.04841495,0.51898734,0.91156840,25,-0.00002350,

@@ -1,0 +1,34 @@
+﻿# env & caches
+.env
+.env.*
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.log
+
+# local data & outputs
+data/
+logs/
+reports/
+*.db
+
+# patches & build
+*.patch
+dist/
+build/
+*.egg-info/
+
+# large/optional stuff
+ml_models/
+*.pt
+*.pth
+*.pkl
+*.joblib
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+!.vscode/tasks.json
+!.vscode/launch.json
