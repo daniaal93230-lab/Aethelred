@@ -1,4 +1,4 @@
-﻿param(
+param(
   [switch]$Install
 )
 
@@ -27,6 +27,6 @@ Write-Host "`nRunning MyPy..."
 mypy api
 
 Write-Host "`nRunning pytest..."
-pytest -q .\tests_api
+pytest -q .\tests_api --cov=api --cov-report=term-missing:skip-covered
 
 Write-Host "`nAll checks finished."
