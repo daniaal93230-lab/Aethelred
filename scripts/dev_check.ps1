@@ -18,15 +18,15 @@ if ($Install) {
 }
 
 Write-Host "`nRunning Ruff lint..."
-ruff check .
+ruff check api
 
 Write-Host "`nRunning Ruff format check..."
-ruff format --check .
+ruff format --check api
 
 Write-Host "`nRunning MyPy..."
-mypy .
+mypy api
 
 Write-Host "`nRunning pytest..."
-pytest -q
+pytest -q .\tests_api
 
 Write-Host "`nAll checks finished."

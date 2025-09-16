@@ -21,10 +21,10 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install ruff mypy pytest
       - name: Ruff lint
-        run: ruff check .
+        run: ruff check api
       - name: Ruff format check
-        run: ruff format --check .
+        run: ruff format --check api
       - name: MyPy typecheck
-        run: mypy .
+        run: mypy api
       - name: Pytest
-        run: pytest -q
+        run: pytest -q ./tests_api

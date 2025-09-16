@@ -6,14 +6,14 @@ from core.execution_engine import ExecutionEngine
 def main():
     parser = argparse.ArgumentParser(description="Run Caelus Live Strategy Execution")
     parser.add_argument(
-        "--symbol", 
-        type=str, 
-        default="BTCUSDT", 
+        "--symbol",
+        type=str,
+        default="BTCUSDT",
         help="Trading symbol (default: BTCUSDT)"
     )
     parser.add_argument(
-        "--trade", 
-        action="store_true", 
+        "--trade",
+        action="store_true",
         help="Execute trade if signal is BUY or SELL"
     )
 
