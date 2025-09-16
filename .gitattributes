@@ -7,3 +7,8 @@
 *.toml          eol=lf
 *.py            eol=lf
 *.sql           eol=lf
+.gitattributes    text eol=lf
+*.json            eol=lf
+*.env             eol=lf
+*.psm1            eol=crlf
+*.psd1            eol=crlf
