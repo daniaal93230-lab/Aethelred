@@ -1,0 +1,25 @@
+﻿[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = ["venv", ".venv", "ml_models", "data", "build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ANN"]
+ignore = ["ANN101", "ANN102"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+exclude = "(venv|.venv|build|dist|ml_models|data)"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
