@@ -50,7 +50,7 @@ def fetch_ohlcv_paginated(exchange, symbol: str, timeframe: str, total_limit: in
     Fetch up to `total_limit` OHLCV candlesticks from the exchange for a given symbol and timeframe.
     Uses multiple requests if necessary to page through the data.
     Returns a list of [timestamp, open, high, low, close, volume] entries, including only closed bars up to the latest complete interval.
-    
+
     Parameters:
         exchange: ccxt exchange instance (with markets loaded or will be loaded).
         symbol (str): Market symbol (e.g. "BTC/USDT").
@@ -62,18 +62,18 @@ def fetch_ohlcv_paginated(exchange, symbol: str, timeframe: str, total_limit: in
         exchange.load_markets()
     tf_ms = tf_to_ms(timeframe)
     target_last = expected_last_closed_ms(timeframe)  # Only fetch up to last closed bar
-    
+
     # Determine maximum batch size per request (if exchange has specific limit for OHLCV fetch)
     per_request = 1000  # default conservative max
     if hasattr(exchange, "options") and isinstance(exchange.options, dict):
         maybe = exchange.options.get("OHLCVLimit") or exchange.options.get("fetchOHLCVLimit")
         if isinstance(maybe, int) and maybe > 0:
             per_request = min(per_request, maybe)
-    
+
     earliest_needed = target_last - (total_limit * tf_ms)
     result: List[List[float]] = []
     since = earliest_needed
-    
+
     # Loop to fetch data in batches until we have the requested number of candles or run out of data
     while True:
         remaining = total_limit - len(result)

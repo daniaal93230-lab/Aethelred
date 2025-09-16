@@ -14,14 +14,17 @@ from fastapi import FastAPI, Query
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
+from pydantic import BaseModel
+
 # Paths
-ROOT = Path(__file__).resolve().parents[1]   # project root
-DASH_DIR = ROOT / "dashboard"                # dashboard folder
-METRICS_DIR = ROOT                           # metrics live in project root
+ROOT = Path(__file__).resolve().parents[1]  # project root
+DASH_DIR = ROOT / "dashboard"  # dashboard folder
+METRICS_DIR = ROOT  # metrics live in project root
 SETTINGS_PATH = Path("runtime_settings.json")
 DEFAULT_SETTINGS = {"risk": 0.02, "max_pos": 1.0, "no_short": True, "circuit": False}
 DB_PATH = Path("data/ledger.db")
 DB_PATH.parent.mkdir(exist_ok=True)
+
 
 def init_db():
     con = sqlite3.connect(DB_PATH)
@@ -34,14 +37,28 @@ def init_db():
     for led in Path(".").glob("*_ledger.csv"):
         with led.open("r", newline="", encoding="utf-8") as fh:
             rd = csv.DictReader(fh)
-            rows = [(r["symbol"], r["signal"], r["entry_time"], r.get("exit_time",""),
-                     float(r.get("entry_price",0) or 0), float(r.get("exit_price",0) or 0),
-                     float(r.get("pnl",0) or 0), float(r.get("pnl_pct",0) or 0),
-                     int(r.get("hold_s",0) or 0)) for r in rd if r.get("entry_time")]
+            rows = [
+                (
+                    r["symbol"],
+                    r["signal"],
+                    r["entry_time"],
+                    r.get("exit_time", ""),
+                    float(r.get("entry_price", 0) or 0),
+                    float(r.get("exit_price", 0) or 0),
+                    float(r.get("pnl", 0) or 0),
+                    float(r.get("pnl_pct", 0) or 0),
+                    int(r.get("hold_s", 0) or 0),
+                )
+                for r in rd
+                if r.get("entry_time")
+            ]
             cur.executemany("INSERT INTO trades VALUES(?,?,?,?,?,?,?,?,?)", rows)
-    con.commit(); con.close()
+    con.commit()
+    con.close()
+
 
 init_db()
+
 
 def load_settings():
     try:
@@ -49,23 +66,28 @@ def load_settings():
     except Exception:
         return DEFAULT_SETTINGS.copy()
 
+
 def save_settings(obj):
     SETTINGS_PATH.write_text(json.dumps(obj, indent=2), encoding="utf-8")
 
-app = FastAPI(title="Aethelred API")         # <— named 'app' for uvicorn
 
-# ─────────────────────────────────────────────
+app = FastAPI(title="Aethelred API")  # <â€” named 'app' for uvicorn
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Helpers
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
 
 def _isfinite(x) -> bool:
     try:
         return math.isfinite(float(x))
     except Exception:
         return False
+
 
 def _sanitize(o):
     if isinstance(o, dict):
@@ -75,6 +97,7 @@ def _sanitize(o):
     if isinstance(o, float):
         return None if not _isfinite(o) else float(o)
     return o
+
 
 def _tail_csv(path: Path, n: int) -> str:
     """Return last n rows (with header) of a CSV."""
@@ -95,20 +118,24 @@ def _tail_csv(path: Path, n: int) -> str:
         body = body[-n:] if n > 0 else body
         return "\n".join([header] + body) + ("\n" if body else "")
 
-# ─────────────────────────────────────────────
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Static dashboard
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 if DASH_DIR.exists():
     app.mount("/assets", StaticFiles(directory=DASH_DIR), name="assets")
+
 
 @app.get("/", response_class=HTMLResponse)
 def home():
     return HTMLResponse('<meta http-equiv="refresh" content="0; url=/dashboard/"/>', status_code=200)
 
+
 @app.get("/dashboard", response_class=HTMLResponse)
 def dash_redirect():
     return HTMLResponse('<meta http-equiv="refresh" content="0; url=/dashboard/"/>', status_code=307)
+
 
 @app.get("/dashboard/", response_class=HTMLResponse)
 def dashboard():
@@ -117,14 +144,17 @@ def dashboard():
         return HTMLResponse("<h3>Dashboard not found</h3>", status_code=404)
     return FileResponse(str(index_file))
 
-# ─────────────────────────────────────────────
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Metrics
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 
 @app.get("/metrics")
 def list_metrics():
     files = [p.name for p in METRICS_DIR.glob("*_metrics.csv")]
     return {"metric_files": sorted(files)}
+
 
 @app.get("/metrics/{name}", response_class=PlainTextResponse)
 def get_metrics_csv(name: str, n: int = Query(200, ge=0, le=5000)):
@@ -133,9 +163,11 @@ def get_metrics_csv(name: str, n: int = Query(200, ge=0, le=5000)):
         return PlainTextResponse("", status_code=404)
     return PlainTextResponse(_tail_csv(path, n=n), status_code=200)
 
-# ─────────────────────────────────────────────
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Signals (combine all *_signal.json)
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 
 @app.get("/signals")
 def get_signals():
@@ -148,9 +180,11 @@ def get_signals():
             continue
     return JSONResponse(data)
 
-# ─────────────────────────────────────────────
-# Trades — closed last 24h + open positions
-# ─────────────────────────────────────────────
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Trades â€” closed last 24h + open positions
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 
 def _col(df: pd.DataFrame, *options: str) -> Optional[str]:
     """Find a column in df ignoring case."""
@@ -159,6 +193,7 @@ def _col(df: pd.DataFrame, *options: str) -> Optional[str]:
         if o in lower:
             return lower[o]
     return None
+
 
 def _load_price_map_from_signals() -> Dict[str, float]:
     """Map symbol -> latest price from *_signal.json."""
@@ -173,6 +208,7 @@ def _load_price_map_from_signals() -> Dict[str, float]:
         except Exception:
             continue
     return mp
+
 
 def _detect_trades_and_open_positions(
     ledger_path: Path,
@@ -233,16 +269,18 @@ def _detect_trades_and_open_positions(
             pnl_pct = (exit_price / entry_price - 1.0) * (1 if pos > 0 else -1)
             hold_mins = (ts - entry_row[c_ts].to_pydatetime()).total_seconds() / 60.0
 
-            closed.append({
-                "symbol": symbol,
-                "side": side,
-                "entry_time": entry_row[c_ts].to_pydatetime().isoformat(),
-                "exit_time": ts.isoformat(),
-                "entry_price": float(round(entry_price, 8)),
-                "exit_price": float(round(exit_price, 8)),
-                "pnl_pct": float(pnl_pct),
-                "holding_mins": float(round(hold_mins, 2)),
-            })
+            closed.append(
+                {
+                    "symbol": symbol,
+                    "side": side,
+                    "entry_time": entry_row[c_ts].to_pydatetime().isoformat(),
+                    "exit_time": ts.isoformat(),
+                    "entry_price": float(round(entry_price, 8)),
+                    "exit_price": float(round(exit_price, 8)),
+                    "pnl_pct": float(pnl_pct),
+                    "holding_mins": float(round(hold_mins, 2)),
+                }
+            )
 
             # flip?
             pos = s
@@ -260,17 +298,20 @@ def _detect_trades_and_open_positions(
         pnl_unreal = (cur_price / entry_price - 1.0) * (1 if pos > 0 else -1)
         hold_mins = (_now_utc() - entry_row[c_ts].to_pydatetime()).total_seconds() / 60.0
 
-        opens.append({
-            "symbol": symbol,
-            "side": side,
-            "entry_time": entry_row[c_ts].to_pydatetime().isoformat(),
-            "entry_price": float(round(entry_price, 8)),
-            "current_price": float(round(cur_price, 8)),
-            "unrealized_pct": float(pnl_unreal),
-            "holding_mins": float(round(hold_mins, 2)),
-        })
+        opens.append(
+            {
+                "symbol": symbol,
+                "side": side,
+                "entry_time": entry_row[c_ts].to_pydatetime().isoformat(),
+                "entry_price": float(round(entry_price, 8)),
+                "current_price": float(round(cur_price, 8)),
+                "unrealized_pct": float(pnl_unreal),
+                "holding_mins": float(round(hold_mins, 2)),
+            }
+        )
 
     return closed, opens
+
 
 def _gather_last24h(pattern: str, symbol: Optional[str]) -> dict:
     since = _now_utc() - timedelta(days=1)
@@ -299,42 +340,49 @@ def _gather_last24h(pattern: str, symbol: Optional[str]) -> dict:
     avg_pnl = (pnl_sum / total) if total else 0.0
     win_rate = (wins / total) if total else 0.0
 
-    return _sanitize({
-        "as_of": _now_utc().isoformat(),
-        "window": "24h",
-        "closed_summary": {
-            "count": total,
-            "win_rate": win_rate,
-            "pnl_sum": pnl_sum,
-            "pnl_avg": avg_pnl,
-        },
-        "closed": closed_all,
-        "open": open_all,
-    })
+    return _sanitize(
+        {
+            "as_of": _now_utc().isoformat(),
+            "window": "24h",
+            "closed_summary": {
+                "count": total,
+                "win_rate": win_rate,
+                "pnl_sum": pnl_sum,
+                "pnl_avg": avg_pnl,
+            },
+            "closed": closed_all,
+            "open": open_all,
+        }
+    )
+
 
 @app.get("/trades/last24h")
-def trades_last24h(pattern: str = Query("*_ledger.csv"),
-                   symbol: Optional[str] = Query(None)):
+def trades_last24h(pattern: str = Query("*_ledger.csv"), symbol: Optional[str] = Query(None)):
     """Closed trades in last 24h + current open positions."""
     return JSONResponse(_gather_last24h(pattern=pattern, symbol=symbol))
 
-# ─────────────────────────────────────────────
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Health
-# ─────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 
 @app.get("/health")
 def health():
     return {"ok": True, "time": _now_utc().isoformat()}
 
+
 @app.get("/settings")
 def get_settings():
     return load_settings()
+
 
 class SettingsPayload(BaseModel):
     risk: float
     max_pos: float
     no_short: bool
     circuit: bool
+
 
 @app.post("/settings")
 def post_settings(payload: SettingsPayload):
@@ -343,13 +391,14 @@ def post_settings(payload: SettingsPayload):
     save_settings(s)
     return {"ok": True, "settings": s}
 
+
 @app.get("/trades/summary")
 def trades_summary():
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
     cur = con.cursor()
     cur.execute("""
-      SELECT 
+      SELECT
         COUNT(*) as n,
         SUM(pnl) as pnl,
         AVG(pnl) as avg_pnl,
@@ -360,4 +409,3 @@ def trades_summary():
     row = dict(cur.fetchone())
     con.close()
     return row
-
