@@ -1,5 +1,8 @@
 *               text=auto
+.gitattributes  text eol=lf
 *.ps1           eol=crlf
+*.psm1          eol=crlf
+*.psd1          eol=crlf
 *.bat           eol=crlf
 *.sh            eol=lf
 *.yml           eol=lf
@@ -7,8 +10,20 @@
 *.toml          eol=lf
 *.py            eol=lf
 *.sql           eol=lf
-.gitattributes    text eol=lf
-*.json            eol=lf
-*.env             eol=lf
-*.psm1            eol=crlf
-*.psd1            eol=crlf
+*.json          eol=lf
+*.env           eol=lf
+
+# Binary files
+*.png           -text
+*.jpg           -text
+*.jpeg          -text
+*.gif           -text
+*.ico           -text
+*.pdf           -text
+*.zip           -text
+*.gz            -text
+*.7z            -text
+*.tar           -text
+*.pyc           -text
+
+.editorconfig  text eol=lf
