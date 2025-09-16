@@ -2,6 +2,7 @@
 import logging
 import sys
 
+
 def get_logger(name: str = "aethelred"):
     logger = logging.getLogger(name)
     if logger.handlers:
