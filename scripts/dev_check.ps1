@@ -27,6 +27,6 @@ Write-Host "`nRunning MyPy..."
 mypy api
 
 Write-Host "`nRunning pytest..."
-pytest -q .\tests_api --cov=api --cov-report=term-missing:skip-covered
+pytest -q .\tests_api --cov=api --cov-report=term-missing:skip-covered --cov-fail-under=30
 
 Write-Host "`nAll checks finished."
