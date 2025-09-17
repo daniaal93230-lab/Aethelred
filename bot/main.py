@@ -395,7 +395,7 @@ def main() -> None:
             allow_long=args.allow_long, allow_short=args.allow_short
         )
 
-    
+
 
     # Latest signal & age
     side_now, age_bars = evaluator.last_signal_within(full_signal, bars=max(args.entry_age, 1))

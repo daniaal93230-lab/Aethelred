@@ -1,9 +1,10 @@
 import sqlite3  # Built-in library for working with SQLite
-import os       # To check file existence and paths
+import os  # To check file existence and paths
 
 # Define the path to the schema file
 SCHEMA_PATH = os.path.join("db", "schema.sql")
 DB_PATH = "trades.db"  # Name of our SQLite database file
+
 
 def init_db():
     """
@@ -23,6 +24,7 @@ def init_db():
     # Save changes and close the connection
     conn.commit()
     conn.close()
+
 
 # This block ensures the function runs only when this file is executed directly
 if __name__ == "__main__":

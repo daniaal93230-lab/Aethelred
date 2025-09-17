@@ -204,10 +204,10 @@ def backtest_long_only(
         if position_units == 0 and bool(df["entry_long"].iloc[i]):
             buy_px = price * (1.0 + slippage_bps / 10_000.0)
             trade_cash = balance * fraction_per_trade
-            if trade_cash <= 0: 
+            if trade_cash <= 0:
                 continue
             units = trade_cash / buy_px
-            if units <= 0: 
+            if units <= 0:
                 continue
             gross = units * buy_px
             fee = gross * fee_rate

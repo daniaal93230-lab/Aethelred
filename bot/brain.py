@@ -866,7 +866,7 @@ def main() -> None:
         if interval.endswith("d"):
             return 1
         return 24  # fallback
-    
+
     # ... inside main(), after pnl_from_signal(...) gives ret_net_full, pos_full
     bars_24h = min(len(pos_full), _bars_in_day(args.interval))
 
@@ -1044,5 +1044,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-

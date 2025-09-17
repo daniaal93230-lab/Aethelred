@@ -1,0 +1,31 @@
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+exclude = [
+  "venv", ".venv", "ml_models", "data", "build", "dist",
+  "bot", "core", "backtest_strategy.py",
+  "tests", "strategy", "fetch_market_data.py", "run_live.py"
+]
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = ["E501", "E401", "E701", "E702", "E741"]  # add E741 for now
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+[tool.mypy]
+disable_error_code = ["index"]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+exclude = "(venv|.venv|build|dist|ml_models|data|bot|core)"
+files = ["api"]  # only type-check API for now
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
