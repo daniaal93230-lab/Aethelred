@@ -1,8 +1,8 @@
-# bot/brain.py
-# Aethelred Brain — walk-forward regime selection, optional ML gating,
+﻿# bot/brain.py
+# Aethelred Brain â€” walk-forward regime selection, optional ML gating,
 # paper ledger + metrics output for the dashboard.
 #
-# ──────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # SECTION INDEX (use your editor's search with:  # [Sx]  ):
 # [S1] Imports & small utilities
 # [S2] Strategy parameter helpers & regime helpers
@@ -12,12 +12,12 @@
 # [S6] CSV helpers
 # [S7] Auto-tune (windows & ADX)
 # [S8] CLI (parse_args)
-# [S9] main() — ties everything together
-# ──────────────────────────────────────────────────────────────────────────────
+# [S9] main() â€” ties everything together
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 from __future__ import annotations
 
-# [S1] ─────────────────────────────────────────────────────────────────────────
+# [S1] â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Imports & small utilities
 
 import argparse
@@ -42,7 +42,9 @@ from bot.strategy import (
 )
 from bot.autoparams import suggest_params_from_df, persist_params, load_persisted
 from bot.ml import train_save_model, predict_last_proba
-
+from bot.ml import ml_model_path
+from bot.ml import ml_model_path`r`n
+from bot.ml import ml_model_path
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -96,7 +98,7 @@ def sanitize(obj: Any) -> Any:
     return obj
 
 
-# [S2] ─────────────────────────────────────────────────────────────────────────
+# [S2] â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Strategy parameter helpers & regime helpers
 # (These helpers keep params in one place and are used both in selection and live)
 
@@ -141,7 +143,7 @@ def _default_ml_model_path(symbol: str, interval: str) -> Path:
     return Path("ml_models") / f"{symbol.replace('/', '_')}_{interval}_lin.pkl"
 
 
-# [S3] ─────────────────────────────────────────────────────────────────────────
+# [S3] â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # PnL & metrics (bar level + trade level)
 # (Used by both walk-forward selection and live reporting)
 
@@ -250,7 +252,7 @@ def compute_metrics(interval: str,
     }
 
 
-# [S4] ─────────────────────────────────────────────────────────────────────────
+# [S4] â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Walk-forward selection (folds + best strategy per regime)
 # (Feeds: [S3] metrics, Uses: [S2] params, Returns: chosen name + folds)
 
@@ -389,7 +391,7 @@ def walk_forward_select(
     return chosen, folds
 
 
-# [S5] ─────────────────────────────────────────────────────────────────────────
+# [S5] â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Paper state, ATR sizing & ledger
 # (Used only in live run; independent of selection)
 
@@ -462,7 +464,7 @@ def append_paper_ledger(ledger_path: Path, ts: str, symbol: str, signal: str, pr
         f.write(line)
 
 
-# [S6] ─────────────────────────────────────────────────────────────────────────
+# [S6] â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # CSV helpers
 # (Shared by API/dashboard; keeps CSV schema stable)
 
@@ -489,7 +491,7 @@ def append_metrics_csv(path: Path, payload: Dict[str, Any]) -> None:
         f.write(",".join(row) + "\n")
 
 
-# [S7] ─────────────────────────────────────────────────────────────────────────
+# [S7] â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Auto-tune (windows & ADX)
 # (Very lightweight; gives healthy fold counts without deep grid-search)
 
@@ -497,7 +499,7 @@ def _pick_reasonable_adx(interval: str) -> Tuple[int, int]:
     cpd = _candles_per_day(interval)
     if cpd >= 288:     # <= 5m
         return 20, 14
-    elif cpd >= 96:    # 15–30m
+    elif cpd >= 96:    # 15â€“30m
         return 18, 14
     elif cpd >= 24:    # 1h
         return 15, 14
@@ -511,7 +513,7 @@ def auto_tune(df: pd.DataFrame, interval: str, min_folds: int = 3) -> Dict[str, 
     for tr, te, st in _window_grid(N, min_folds=min_folds):
         total = tr + te
         folds = 1 + (N - total) // st
-        # prefer ≈5 folds and larger train
+        # prefer â‰ˆ5 folds and larger train
         score = folds - 0.1 * abs(folds - 5) + 1e-6 * tr
         if score > best["score"]:
             best = {"score": score, "train": tr, "test": te, "step": st}
@@ -521,7 +523,7 @@ def auto_tune(df: pd.DataFrame, interval: str, min_folds: int = 3) -> Dict[str, 
     return best
 
 
-# [S8] ─────────────────────────────────────────────────────────────────────────
+# [S8] â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # CLI (parse_args)
 # (All knobs in one place; main() reads this once)
 
@@ -587,7 +589,7 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--min-sharpe-select", type=float, default=0.20,
                     help="Minimum OOS Sharpe required to accept a WF selection")
     ap.add_argument("--no-require-pos-expectancy", action="store_true",
-                    help="Allow selection even if best OOS expectancy ≤ 0")
+                    help="Allow selection even if best OOS expectancy â‰¤ 0")
 
     # optional regime/persist
     ap.add_argument("--auto-regime",          action="store_true",
@@ -612,8 +614,8 @@ def parse_args() -> argparse.Namespace:
     return ap.parse_args()
 
 
-# [S9] ─────────────────────────────────────────────────────────────────────────
-# main() — ties everything together
+# [S9] â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# main() â€” ties everything together
 # Flow:
 #   1) Fetch data
 #   2) (optional) auto-tune / load persisted params / regime-adapt
@@ -645,12 +647,12 @@ def main() -> None:
     fee_rate = float(args.fee)
     slip_rate = _slip_from_bps(args.slip_bps)
 
-    # ── data
+    # â”€â”€ data
     df = fetch_ohlcv_paginated(args.exchange, args.symbol, args.interval, args.limit)
     if df.empty or len(df) < 50:
         raise RuntimeError("Insufficient OHLCV data. Check symbol/timeframe or increase --limit.")
 
-    # ── ML training-only mode
+    # â”€â”€ ML training-only mode
     if args.ml_train:
         out_path = Path(args.ml_model_file) if args.ml_model_file else _default_ml_model_path(args.symbol, args.interval)
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -658,12 +660,12 @@ def main() -> None:
         print(f"[ML] Trained & saved model to: {out_path}")
         return
 
-    # ── windows / adx defaults
+    # â”€â”€ windows / adx defaults
     wf_train, wf_test, wf_step = args.wf_train, args.wf_test, args.wf_step
     adx_th, adx_len = args.adx_trend_threshold, args.adx_len
     auto_tuned = False
 
-    # ── optionally load persisted params first
+    # â”€â”€ optionally load persisted params first
     if args.use_persisted_params:
         loaded = load_persisted(args.symbol, args.interval)
         if loaded:
@@ -673,7 +675,7 @@ def main() -> None:
             adx_th   = float(loaded.get("adx_trend_threshold", adx_th))
             adx_len  = int(loaded.get("adx_len", adx_len))
 
-    # ── adaptive windows if requested windows don't fit data
+    # â”€â”€ adaptive windows if requested windows don't fit data
     req_total = wf_train + wf_test + 10
     if len(df) < req_total:
         total = max(50, len(df) - 10)
@@ -684,14 +686,14 @@ def main() -> None:
               f"({len(df)} < {req_total}). Using adaptive windows: "
               f"train={wf_train}, test={wf_test}, step={wf_step}.")
 
-    # ── optional: auto-tune (lightweight heuristic)
+    # â”€â”€ optional: auto-tune (lightweight heuristic)
     if args.auto_tune:
         tuned = auto_tune(df, args.interval, min_folds=args.min_folds)
         wf_train, wf_test, wf_step = tuned["train"], tuned["test"], tuned["step"]
         adx_th, adx_len = tuned["adx_trend_threshold"], tuned["adx_len"]
         auto_tuned = True
 
-    # ── optional: regime-adaptive params
+    # â”€â”€ optional: regime-adaptive params
     if args.auto_regime:
         sug = suggest_params_from_df(df, args.interval)
         wf_train = int(sug.get("wf_train", wf_train))
@@ -700,7 +702,7 @@ def main() -> None:
         adx_th   = float(sug.get("adx_trend_threshold", adx_th))
         adx_len  = int(sug.get("adx_len", adx_len))
 
-    # ── WF selection
+    # â”€â”€ WF selection
     chosen, folds = walk_forward_select(
         df=df,
         timeframe=args.interval,
@@ -716,7 +718,7 @@ def main() -> None:
         min_trades=args.min_trades,
     )
 
-    # ── Selection guard: ensure OOS quality before taking the live signal
+    # â”€â”€ Selection guard: ensure OOS quality before taking the live signal
     MIN_OOS_SHARPE = float(args.min_sharpe_select)
     REQ_POS_EXP = not args.no_require_pos_expectancy
 
@@ -740,9 +742,9 @@ def main() -> None:
         elif total_oos_trades < args.min_trades:
             guard_reject_reason = f"OOS trades {total_oos_trades} < {args.min_trades}"
         elif REQ_POS_EXP and best_oos_exp <= 0:
-            guard_reject_reason = "OOS expectancy ≤ 0"
+            guard_reject_reason = "OOS expectancy â‰¤ 0"
 
-    # ── Build live signal series for chosen strategy (or flat if guard failed)
+    # â”€â”€ Build live signal series for chosen strategy (or flat if guard failed)
     close, high, low = df["close"], df["high"], df["low"]
     if guard_ok:
         if chosen == "ma":
@@ -794,7 +796,7 @@ def main() -> None:
             elif last_sig == 0 and p_up >= args.ml_threshold:
                 last_sig = 1
                 sig_text = "LONG"
-                ml_vote = f"boost long (p_up={p_up:.3f} ≥ thr {args.ml_threshold:.2f})"
+                ml_vote = f"boost long (p_up={p_up:.3f} â‰¥ thr {args.ml_threshold:.2f})"
             else:
                 ml_vote = f"neutral (p_up={p_up:.3f})"
         except Exception as e:
@@ -842,7 +844,7 @@ def main() -> None:
 
     sig_text = {1: "LONG", -1: "SHORT", 0: "FLAT"}.get(last_sig, "FLAT")
 
-    # ── compute net returns and metrics for the chosen strategy
+    # â”€â”€ compute net returns and metrics for the chosen strategy
     # Note: only the last signal bar may be gated by ML; history is unaffected.
     sig_series = sig_series.copy()
     sig_series.iloc[-1] = last_sig
@@ -878,14 +880,14 @@ def main() -> None:
     # (optional) you can expose more intraday fields later
     intraday = {"trades_24h": trades_24h}
 
-    # ── debug folds
+    # â”€â”€ debug folds
     if args.debug_segments and folds:
         print("\n[WF Segments]")
         df_f = pd.DataFrame([asdict(f) for f in folds])
         with pd.option_context("display.max_rows", None, "display.width", 140):
             print(df_f.tail(12).to_string(index=False))
 
-    # ── emit JSON signal (NaN-safe)
+    # â”€â”€ emit JSON signal (NaN-safe)
     sig_path = Path(args.emit_json_file if args.emit_json else "brain_signal.json")
     payload = {
         "generated_at": _now_iso(),
@@ -937,7 +939,7 @@ def main() -> None:
     if args.emit_json:
         sig_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
-    # ── optional paper equity update
+    # â”€â”€ optional paper equity update
     paper_equity_val: Optional[float] = None
     if args.paper_ledger:
         paper_fee = _slip_from_bps(args.paper_fee_bps) if args.paper_fee_bps is not None else fee_rate
@@ -983,7 +985,7 @@ def main() -> None:
             )
             paper_equity_val = state.equity
 
-    # ── append metrics CSV (for dashboard)
+    # â”€â”€ append metrics CSV (for dashboard)
     metrics_path = _metrics_path_from_signal(sig_path, args.metrics_file)
     append_metrics_csv(metrics_path, {
         "ts": _now_iso(),
@@ -1005,7 +1007,7 @@ def main() -> None:
         "paper_equity": f"{paper_equity_val:.2f}" if paper_equity_val is not None else "",
     })
 
-    # ── optional: persist effective params (so future runs can reuse them)
+    # â”€â”€ optional: persist effective params (so future runs can reuse them)
     if args.persist_params:
         persist_params(
             args.symbol,
@@ -1021,7 +1023,7 @@ def main() -> None:
             }
         )
 
-    # ── banner (friendly console summary)
+    # â”€â”€ banner (friendly console summary)
     print("\n====== BRAIN DECISION ======")
     print(f"Time:   {_now_iso()}")
     print(f"Pair:   {args.symbol}  TF: {args.interval}  Strategy: {chosen.upper()}")
@@ -1035,7 +1037,7 @@ def main() -> None:
 
     # Show guard & ML hints (compact)
     if not guard_ok:
-        print(f"[GUARD] Selection rejected → FLAT. Reason: {guard_reject_reason}")
+        print(f"[GUARD] Selection rejected â†’ FLAT. Reason: {guard_reject_reason}")
     if ml_info.get("p_up") is not None:
         print(f"[ML] p_up={ml_info['p_up']:.3f}  thr={ml_info['threshold']:.2f}  model={ml_info.get('model')}")
 
