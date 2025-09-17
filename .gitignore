@@ -32,3 +32,9 @@ Thumbs.db
 .vscode/
 !.vscode/tasks.json
 !.vscode/launch.json
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
