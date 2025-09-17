@@ -47,3 +47,8 @@ tuner_mem.json
 *.p12
 *.sqlite
 *.sqlite3
+
+# coverage artefacts
+.coverage
+coverage.xml
+htmlcov/

@@ -1,0 +1,61 @@
+name: Apply /apply patch comments
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  apply-patch:
+    # Require the /apply prefix AND restrict who can trigger it for safety
+    if: |
+      startsWith(github.event.comment.body, '/apply') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract diff block
+        id: extract
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.comment.body || "";
+            const m = body.match(/```diff\s+([\s\S]*?)```/m);
+            if (!m) core.setFailed('No ```diff``` fenced block found.');
+            const patch = (m[1] || "").trim() + "\n";
+            const fs = require('fs');
+            const crypto = require('crypto');
+            fs.writeFileSync('patch.diff', patch);
+            const short = crypto.createHash('sha1').update(patch).digest('hex').slice(0,7);
+            core.setOutput('short', short);
+
+      - name: Apply patch and push branch
+        run: |
+          set -eux
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BR="apply/${{ steps.extract.outputs.short }}"
+          git checkout -b "$BR"
+          git apply --whitespace=fix patch.diff
+          git add -A
+          git commit -m "Apply patch from ${{ github.event.comment.html_url }}"
+          git push --set-upstream origin "$BR"
+
+      - name: Open PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const base = context.payload.repository.default_branch;
+            const head = `apply/${{ steps.extract.outputs.short }}`;
+            const title = `Apply patch from comment by @${context.payload.comment.user.login}`;
+            const body  = `Applied patch from [comment](${context.payload.comment.html_url}).`;
+            await github.rest.pulls.create({ owner, repo, title, head, base, body });
