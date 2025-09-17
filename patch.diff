@@ -1,0 +1,110 @@
+diff --git a/Dockerfile b/Dockerfile
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/Dockerfile
+@@ -0,0 +22 @@
++# syntax=docker/dockerfile:1
++FROM python:3.13-slim
++
++# Python runtime behaviour
++ENV PYTHONDONTWRITEBYTECODE=1
++ENV PYTHONUNBUFFERED=1
++ENV PIP_NO_CACHE_DIR=1
++ENV PIP_DISABLE_PIP_VERSION_CHECK=1
++ENV UVICORN_PORT=8080
++
++# OS deps
++RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
++
++WORKDIR /app
++COPY requirements.txt requirements-dev.txt ./
++RUN pip install --upgrade pip && pip install -r requirements.txt -r requirements-dev.txt
++
++# copy source
++COPY . .
++
++EXPOSE 8080
++CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
+diff --git a/.dockerignore b/.dockerignore
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/.dockerignore
+@@ -0,0 +20 @@
++.git
++.gitignore
++__pycache__/
++*.pyc
++*.pyo
++*.pyd
++*.sqlite*
++.env
++venv/
++.venv/
++dist/
++build/
++.coverage
++coverage.xml
++htmlcov/
++.patch-inbox-ok
++patch.diff
++*.log
+diff --git a/.env.example b/.env.example
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/.env.example
+@@ -0,0 +18 @@
++# Example runtime configuration for Aethelred
++ENV=development
++LOG_LEVEL=INFO
++
++# Exchange config (ccxt) — keep real keys in secrets, never commit .env
++EXCHANGE=binanceusdm
++API_KEY=changeme
++API_SECRET=changeme
++API_PASSPHRASE=
++
++# Optional database URL (if/when used)
++DATABASE_URL=sqlite:///./aethelred.db
++
++# CORS (comma-separated)
++ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
+diff --git a/docker-compose.yml b/docker-compose.yml
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/docker-compose.yml
+@@ -0,0 +13 @@
++version: "3.8"
++services:
++  app:
++    build: .
++    ports:
++      - "8080:8080"
++    env_file:
++      - .env
++    restart: unless-stopped
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +12 @@
++.PHONY: run test lint format
++run:
++	uvicorn api.main:app --reload --port 8080
++test:
++	pytest -q tests_api --cov=api --cov-report=term-missing:skip-covered
++lint:
++	ruff check .
++format:
++	ruff format .
+diff --git a/.patch-inbox-ok b/.patch-inbox-ok
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/.patch-inbox-ok
+@@ -0,0 +1 @@
++Inbox runnable ✅
