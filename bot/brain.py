@@ -43,7 +43,8 @@ from bot.strategy import (
 from bot.autoparams import suggest_params_from_df, persist_params, load_persisted
 from bot.ml import train_save_model, predict_last_proba
 from bot.ml import ml_model_path
-from bot.ml import ml_model_path`r`n
+from bot.ml import ml_model_path
+
 from bot.ml import ml_model_path
 
 def _now_iso() -> str:
