@@ -27,4 +27,4 @@ jobs:
       - name: MyPy typecheck
         run: mypy api
       - name: Pytest
-        run: pytest -q ./tests_api --cov=api --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml
+        run: pytest -q ./tests_api --cov=api --cov-report=term-missing:skip-covered --cov-fail-under=30 --cov-report=xml:coverage.xml
