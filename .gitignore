@@ -52,3 +52,10 @@ tuner_mem.json
 .coverage
 coverage.xml
 htmlcov/
+
+# runtime artefacts
+*_state.json
+*_signal.json
+tuner_mem.json
+config.env
+
