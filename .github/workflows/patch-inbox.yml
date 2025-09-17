@@ -1,0 +1,98 @@
+name: Patch inbox (comments or issue body)
+
+on:
+  issue_comment:
+    types: [created, edited]
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  apply:
+    # Only on issues (not PR threads) and only when /apply is present
+    if: >
+      github.event.issue.pull_request == null &&
+      ((github.event_name == 'issue_comment' && contains(github.event.comment.body, '/apply')) ||
+       (github.event_name == 'issues'        && contains(github.event.issue.body,   '/apply')))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Extract patch to patch.diff
+        env:
+          BODY: ${{ github.event_name == 'issue_comment' && github.event.comment.body || github.event.issue.body }}
+        run: |
+          set -e
+          python - <<'PY'
+          import os, re, base64, sys
+          body = os.environ.get("BODY","")
+          m = re.search(r"```(?:diff|patch)\n(.*?)```", body, re.S)
+          if m:
+              data = m.group(1).encode("utf-8")
+          else:
+              m = re.search(r"```base64\n(.*?)```", body, re.S)
+              data = base64.b64decode(m.group(1).strip()) if m else None
+          if not data:
+              print("::error::No ```diff/patch``` or ```base64``` fenced block found"); sys.exit(1)
+          text = data.decode("utf-8","replace").replace("\r\n","\n").replace("\r","\n")
+          if not text.endswith("\n"): text += "\n"
+          open("patch.diff","w",encoding="utf-8").write(text)
+          PY
+
+      - name: Show first 40 lines (debug)
+        run: nl -ba patch.diff | sed -n '1,40p'
+
+      - name: Apply patch and push branch
+        id: push
+        run: |
+          set -eux
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BR="apply/${{ github.run_id }}-${{ github.run_attempt }}"
+          echo "BR=$BR" >> "$GITHUB_OUTPUT"
+          git switch -c "$BR"
+          if ! git apply -p0 --whitespace=fix --index patch.diff; then
+            git reset --hard
+            git apply -p1 --whitespace=fix --index patch.diff
+          fi
+          git commit -m "Apply patch from ${{ github.event_name }}: ${{ github.event.issue.html_url || github.event.comment.html_url }}" || echo "Nothing to commit"
+          git push -u origin "$BR"
+
+      - name: Open PR
+        id: pr
+        uses: actions/github-script@v7
+        env:
+          BR: ${{ steps.push.outputs.BR }}
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const base = context.payload.repository.default_branch;
+            const head = process.env.BR;                 // branch we just pushed
+            const title = `Auto patch from issue #${context.payload.issue.number}`;
+            const src = context.payload.comment?.html_url || context.payload.issue?.html_url;
+            const body = `Applied patch from **${context.eventName}**. Source: ${src}`;
+            const pr = await github.rest.pulls.create({ owner, repo, base, head, title, body });
+            core.setOutput('url', pr.data.html_url);
+            core.setOutput('number', String(pr.data.number));
+
+      - name: Reply with PR link (best-effort)
+        if: steps.pr.outputs.url != ''
+        continue-on-error: true
+        uses: actions/github-script@v7
+        env:
+          PR_URL: ${{ steps.pr.outputs.url }}
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: `✅ Patch applied. Open PR: ${process.env.PR_URL}`
+            });
