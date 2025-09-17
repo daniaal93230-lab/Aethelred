@@ -1,4 +1,4 @@
-name: Apply patches from issue body or comments
+name: Patch inbox (comments or issue body)
 
 on:
   issue_comment:
@@ -13,7 +13,6 @@ permissions:
 
 jobs:
   apply:
-    # Only on issues (not PR threads) and only when /apply is present
     if: >
       github.event.issue.pull_request == null &&
       ((github.event_name == 'issue_comment' && contains(github.event.comment.body, '/apply')) ||
@@ -35,7 +34,7 @@ jobs:
           body=os.environ.get("BODY","")
           m=re.search(r"```(?:diff|patch)\n(.*?)```", body, re.S)
           if m:
-              data = m.group(1).encode("utf-8")
+              data=m.group(1).encode("utf-8")
           else:
               m=re.search(r"```base64\n(.*?)```", body, re.S)
               data=base64.b64decode(m.group(1).strip()) if m else None
@@ -54,7 +53,7 @@ jobs:
           set -eux
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          BR="apply/${{ github.run_id }}"
+          BR="apply/${{ github.run_id }}-${{ github.run_attempt }}"
           git checkout -b "$BR"
           if ! git apply -p0 --whitespace=fix --index patch.diff; then
             git reset --hard
@@ -69,7 +68,7 @@ jobs:
         with:
           title: "Auto patch from issue #${{ github.event.issue.number }}"
           body:  "Applied patch from **${{ github.event_name }}**. Source: ${{ github.event.comment.html_url || github.event.issue.html_url }}"
-          branch: "apply/${{ github.run_id }}"
+          branch: "apply/${{ github.run_id }}-${{ github.run_attempt }}"
           delete-branch: true
 
       - name: Reply with PR link (best-effort)
