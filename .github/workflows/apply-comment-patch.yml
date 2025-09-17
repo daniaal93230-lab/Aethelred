@@ -1,0 +1,72 @@
+﻿name: Apply patches from issue body or comments
+
+on:
+  issue_comment:
+    types: [created]
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  apply:
+    # Trigger if /apply is present in either the comment body or the issue body,
+    # and we're on an ISSUE (not a PR conversation).
+    if: >
+      github.event.issue.pull_request == null &&
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/apply') ||
+       github.event_name == 'issues' && contains(github.event.issue.body, '/apply'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Extract patch to patch.diff
+        env:
+          BODY: ${{ github.event_name == 'issue_comment' && github.event.comment.body || github.event.issue.body }}
+        run: |
+          python - <<'PY'
+          import os, re, base64, sys
+          body = os.environ.get('BODY') or ''
+          # Prefer a ```diff or ```patch block
+          m = re.search(r"```(diff|patch)\n(.*?)```", body, re.S)
+          data = None
+          if m:
+              data = m.group(2).encode('utf-8')
+          else:
+              # Fallback: ```base64 block containing a base64-encoded unified diff
+              m = re.search(r"```base64\n(.*?)```", body, re.S)
+              if m:
+                  data = base64.b64decode(m.group(1).strip().encode('utf-8'))
+          if not data:
+              print("::error::No ```diff/patch``` or ```base64``` fenced block found"); sys.exit(1)
+          open('patch.diff','wb').write(data)
+          PY
+
+      - name: Apply patch
+        run: |
+          set -e
+          git config user.name "aethelred-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git apply -3 --whitespace=fix patch.diff
+
+      - name: Create PR
+        id: cpr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "Apply patch from issue #${{ github.event.issue.number }}"
+          branch: "auto/apply-${{ github.event_name == 'issue_comment' && github.event.comment.id || github.run_id }}"
+          title: "Auto patch from issue #${{ github.event.issue.number }}"
+          body: "Applied patch from **${{ github.event_name }}**."
+          delete-branch: true
+
+      - name: Reply with PR link
+        if: steps.cpr.outputs.pull-request-number != ''
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ✅ Patch applied. Open PR: ${{ steps.cpr.outputs.pull-request-url }}
