@@ -21,7 +21,7 @@ jobs:
     env:
       PR_BRANCH: apply/${{ github.run_id }}-${{ github.run_attempt }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: ${{ github.event.repository.default_branch }}
