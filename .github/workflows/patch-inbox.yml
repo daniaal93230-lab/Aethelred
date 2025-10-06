@@ -75,7 +75,7 @@ jobs:
       - name: Reply with PR link (best-effort)
         if: steps.cpr.outputs.pull-request-url != ''
         continue-on-error: true
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@v5
         with:
           issue-number: ${{ github.event.issue.number }}
           body: "✅ Patch applied. Open PR: ${{ steps.cpr.outputs.pull-request-url }}"
