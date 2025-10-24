@@ -1,0 +1,14 @@
+{
+  "version": "0.3",
+  "inputs": {
+    "features": ["..."]
+  },
+  "outputs": {
+    "action": ["buy", "sell", "hold"],
+    "sizing": {
+      "risk_bps": "float",
+      "stop_distance_ticks": "int",
+      "atr_multiple": "float"
+    }
+  }
+}

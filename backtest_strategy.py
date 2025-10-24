@@ -1,6 +1,7 @@
 # backtest_strategy.py
 # Three strategies in one file: "ema_crossover", "rsi_mean_reversion", "donchian_breakout"
 import pandas as pd
+from typing import Optional
 from fetch_market_data import fetch_data  # expects fetch_data(symbol, interval, limit)
 
 # ================== CONFIG ==================
@@ -141,14 +142,15 @@ def build_signals_donchian(df: pd.DataFrame) -> pd.DataFrame:
 def backtest(df: pd.DataFrame) -> dict:
     balance = float(START_BALANCE)
     position_units = 0.0
-    entry_price = None
+    entry_price: Optional[float] = None
     cash_out_at_entry = 0.0
-    sl_price = None
-    tp_price = None
+    sl_price: Optional[float] = None
+    tp_price: Optional[float] = None
     cooldown_until = -1
 
     trades = []
-    equity_curve = []
+    from typing import List
+    equity_curve: List[float] = []
 
     def exec_buy(close_price: float, i: int) -> bool:
         nonlocal balance, position_units, entry_price, cash_out_at_entry, sl_price, tp_price
@@ -232,11 +234,11 @@ def backtest(df: pd.DataFrame) -> dict:
 
         # manage open position with SL/TP
         if position_units > 0:
-            if price <= sl_price:
+            if sl_price is not None and price <= sl_price:
                 exec_sell(price, reason="stop_loss")
                 cooldown_until = i + COOLDOWN_BARS
                 continue
-            if price >= tp_price:
+            if tp_price is not None and price >= tp_price:
                 exec_sell(price, reason="take_profit")
                 continue
 
@@ -260,13 +262,17 @@ def backtest(df: pd.DataFrame) -> dict:
 
     # metrics
     if not equity_curve:
-        equity_curve = [START_BALANCE]
-    peak = equity_curve[0]
+        equity_curve = [float(START_BALANCE)]
+    peak = float(equity_curve[0])
     max_dd = 0.0
     for eq in equity_curve:
-        peak = max(peak, eq)
-        dd = (peak - eq) / peak if peak > 0 else 0.0
-        max_dd = max(max_dd, dd)
+        eq_f = float(eq)
+        if eq_f > peak:
+            peak = eq_f
+        if peak > 0.0:
+            dd = (peak - eq_f) / peak
+            if dd > max_dd:
+                max_dd = dd
 
     sells = [t for t in trades if t["action"] == "SELL"]
     wins = [t for t in sells if t.get("realized_pnl", 0.0) > 0.0]

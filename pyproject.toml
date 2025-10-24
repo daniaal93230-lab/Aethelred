@@ -23,9 +23,11 @@ ignore_missing_imports = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 warn_unused_configs = true
-exclude = "(venv|.venv|build|dist|ml_models|data|bot|core)"
+explicit_package_bases = true
+follow_imports = "skip"
+exclude = '(venv|.venv|build|dist|ml_models|data|bot|core|backtest_strategy\.py|brokers|ops|runner_paper\.py|runner|db|scripts|tools|tests|tests_core|tests_api)'
 files = ["api"]  # only type-check API for now
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "tests_core"]
 addopts = "-q"

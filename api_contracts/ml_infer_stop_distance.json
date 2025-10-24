@@ -1,0 +1,21 @@
+{
+  "name": "ml_infer_stop_distance",
+  "version": "1.0",
+  "request": {
+    "symbol": "string",
+    "features": {
+      "type": "object",
+      "description": "Feature map matching model feature_cols",
+      "additionalProperties": {
+        "type": "number"
+      }
+    }
+  },
+  "response": {
+    "symbol": "string",
+    "stop_atr": "number",
+    "horizon_bars": "integer",
+    "model_version": "string",
+    "fit_stats": "object"
+  }
+}

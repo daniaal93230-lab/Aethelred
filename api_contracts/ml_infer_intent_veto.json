@@ -1,0 +1,15 @@
+{
+  "name": "intent_veto_v1",
+  "version": "1.0.0",
+  "input": {
+    "symbol": "str",
+    "ts": "ISO-8601",
+    "features": "object of numeric features matching training schema"
+  },
+  "output": {
+    "p_good": "float in [0,1]",
+    "threshold": "float used to veto",
+    "decision": "allow|veto",
+    "fit_stats": { "auroc": "float", "brier": "float", "ece_pct": "float" }
+  }
+}

@@ -1,0 +1,70 @@
+name: Aethelred Nightly Smoke
+
+on:
+  schedule:
+    # 02:10 UTC every day. Tweak as needed.
+    - cron: "10 2 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  id-token: none
+
+jobs:
+  nightly-smoke:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest joblib scikit-learn pandas pyarrow ccxt matplotlib
+
+      - name: Prepare smoke data
+        run: |
+          mkdir -p data reports
+          # If a committed smoke parquet exists, use it. Otherwise sample.
+          if [ -f "data/ohlcv_smoke.parquet" ]; then
+            echo "Using committed data/ohlcv_smoke.parquet"
+          elif [ -f "data/ohlcv_1m.parquet" ]; then
+            python scripts/sample_data.py --in data/ohlcv_1m.parquet --out data/ohlcv_smoke.parquet --rows 5000
+          else
+            echo "No local parquet present. Fetching a tiny slice from exchange..."
+            python scripts/export_ohlcv_parquet.py --symbols BTC/USDT ETH/USDT SOL/USDT --timeframe 1m --outfile data/ohlcv_smoke.parquet --since 2025-01-01T00:00:00Z
+          fi
+
+      - name: Smoke train stop_distance join only
+        run: |
+          python scripts/train_stop_distance_regressor_v1.py --ohlcv data/ohlcv_smoke.parquet --horizon 5 --save_joined reports/stop_distance_joined_smoke.csv
+          python scripts/eval_stop_distance_v1.py --eval_csv reports/stop_distance_joined_smoke.csv --out reports
+
+      - name: Smoke train intent_veto join only
+        run: |
+          python scripts/train_intent_veto_v1.py --ohlcv data/ohlcv_smoke.parquet --horizon 5 --save_joined
+
+      - name: Upload nightly artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-${{ github.sha }}
+          path: |
+            reports/*.csv
+            reports/*.png
+            data/ohlcv_smoke.parquet
+          if-no-files-found: warn

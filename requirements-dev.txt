@@ -1,2 +1,6 @@
 pre-commit
 pytest-cov
+pytest
+mypy
+ruff
+types-requests

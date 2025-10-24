@@ -1,7 +1,7 @@
 # fetch_market_data.py
 import time
 import math
-import requests
+import requests  # type: ignore[import-untyped]
 import pandas as pd
 
 BINANCE_SPOT = "https://api.binance.com/api/v3/klines"
