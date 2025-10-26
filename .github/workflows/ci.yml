@@ -46,7 +46,9 @@ jobs:
 
       - name: Typecheck - mypy
         run: |
-          mypy api tests_api
+          # Only typecheck the api package here; running mypy on tests_api causes
+          # a failure when that directory isn't treated as a proper module by mypy
+          mypy api
 
       - name: Unit and API tests
         env:
