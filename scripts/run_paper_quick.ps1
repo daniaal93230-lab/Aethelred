@@ -3,7 +3,8 @@ Param(
 )
 
 $ErrorActionPreference = "Stop"
-$env:QA_MODE="1"
+$env:QA_MODE = "1"
+$env:SAFE_FLATTEN_ON_START = "1"
 
 # Resolve venv python if present
 $venvPy = Join-Path -Path ".venv\Scripts" -ChildPath "python.exe"
@@ -13,39 +14,28 @@ if (Test-Path $venvPy) {
   $python = "python"
 }
 
-# Start API in background using the same shell env so QA_MODE is inherited
-Write-Host "Starting API with $python -m uvicorn (QA_MODE=1)..." -ForegroundColor Cyan
-$apiJob = Start-Job -ScriptBlock {
-  param($py)
-  & $py -m uvicorn api.app:app --host 127.0.0.1 --port 8000
-} -ArgumentList $python
+Write-Host "Starting API (QA_MODE=1) with safe startup..." -ForegroundColor Cyan
+$apiProc = Start-Process -FilePath $python -ArgumentList "-m uvicorn api.app:app --host 127.0.0.1 --port 8080" -PassThru
+Start-Sleep -Seconds 3
 
-# Wait for /healthz up to 30s
-$deadline = (Get-Date).AddSeconds(30)
-while ((Get-Date) -lt $deadline) {
-  try {
-    $ok = Invoke-RestMethod -Method Get -Uri "$HostUrl/healthz" -TimeoutSec 2
-    if ($ok.ok -eq $true) { break }
-  } catch {
-    Start-Sleep -Seconds 1
-  }
-}
+Write-Host "Starting watchdog..." -ForegroundColor Cyan
+Start-Process -FilePath $python -ArgumentList "scripts/watchdog.py --base http://127.0.0.1:8080 --interval 2 --failures 2" | Out-Null
+Start-Sleep -Seconds 1
 
+Write-Host "Kicking demo /demo/paper_quick_run..."
 try {
-  $ok = Invoke-RestMethod -Method Get -Uri "$HostUrl/healthz" -TimeoutSec 2
+    Invoke-WebRequest -Method POST -Uri "http://127.0.0.1:8080/demo/paper_quick_run" -ContentType "application/json" -Body "{}" | Out-Null
 } catch {
-  Write-Host "API did not become healthy. Job state: $((Get-Job $apiJob.Id).State)" -ForegroundColor Red
-  Receive-Job $apiJob -Keep | Out-String | Write-Host
-  throw "Health check failed"
+    Write-Host "Failed to call demo endpoint: $($_.Exception.Message)"
 }
 
-Write-Host "API healthy. Running /demo/paper_quick_run ..." -ForegroundColor Cyan
-$resp = Invoke-RestMethod -Method Post -Uri "$HostUrl/demo/paper_quick_run" -TimeoutSec 20
-$resp | ConvertTo-Json -Depth 6
+Write-Host "Export trades.csv..."
+try {
+    New-Item -ItemType Directory -Force -Path "exports_download" | Out-Null
+    Invoke-WebRequest -Uri "http://127.0.0.1:8080/export/trades.csv" -OutFile "exports_download/trades.csv" -ErrorAction Stop | Out-Null
+    Write-Host "Saved to exports_download/trades.csv"
+} catch {
+    Write-Host "Export failed: $($_.Exception.Message)"
+}
 
-Write-Host "Exporting trades.csv ..." -ForegroundColor Cyan
-New-Item -ItemType Directory -Force -Path "exports" | Out-Null
-Invoke-RestMethod -Uri "$HostUrl/export/trades.csv" -OutFile "exports/demo_trades.csv"
-Write-Host "Saved to exports/demo_trades.csv" -ForegroundColor Green
-
-Write-Host "To stop API: Stop-Job $($apiJob.Id) ; Receive-Job $($apiJob.Id) ; Remove-Job $($apiJob.Id)" -ForegroundColor Yellow
+Write-Host "Done. To stop watchdog, close its window or kill the process." -ForegroundColor Yellow

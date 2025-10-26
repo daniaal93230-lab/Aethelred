@@ -1,10 +1,55 @@
-from fastapi import APIRouter, Response, HTTPException
+from fastapi import APIRouter, Response, HTTPException, Request
+from fastapi.responses import StreamingResponse
 import sqlite3
 import csv
 import io
 from collections import defaultdict
 from db.db_manager import get_db_path, table_exists
 from api.contracts.decisions_header import DECISIONS_HEADER
+
+TRADES_HEADER = [
+    "ts_open",
+    "ts_close",
+    "symbol",
+    "side",
+    "qty",
+    "entry",
+    "exit",
+    "pnl",
+    "pnl_pct",
+    "fee_usd",
+    "slippage_bps",
+    "note",
+]
+
+_KEY_ALIASES = {
+    "ts_open": ["ts_open", "open_ts", "entry_ts", "opened_ts"],
+    "ts_close": ["ts_close", "close_ts", "exit_ts", "closed_ts"],
+    "symbol": ["symbol", "pair", "instrument"],
+    "side": ["side", "position_side"],
+    "qty": ["qty", "quantity", "size"],
+    "entry": ["entry", "entry_price", "avg_entry"],
+    "exit": ["exit", "exit_price", "avg_exit", "mark_exit"],
+    "pnl": ["pnl", "pnl_usd", "profit"],
+    "pnl_pct": ["pnl_pct", "return_pct", "ret_pct"],
+    "fee_usd": ["fee_usd", "fees_usd", "commission_usd"],
+    "slippage_bps": ["slippage_bps", "slip_bps", "slippage"],
+    "note": ["note", "notes", "comment"],
+}
+
+
+def _coerce_row(row: dict) -> dict:
+    """Map arbitrary engine row keys into TRADES_HEADER keys."""
+    out = {}
+    for k in TRADES_HEADER:
+        val = None
+        for alias in _KEY_ALIASES.get(k, [k]):
+            if alias in row and row[alias] not in (None, ""):
+                val = row[alias]
+                break
+        out[k] = val
+    return out
+
 
 router = APIRouter(prefix="/export", tags=["export"]) if False else APIRouter()
 
@@ -32,70 +77,30 @@ def _fetch_all(q: str, params: tuple = ()) -> list[dict]:
 
 
 @router.get("/trades.csv")
-def export_trades_csv():
+def export_trades_csv(request: Request):
     """
-    Defensive exporter.
-    Works if DB has either:
-      - paper_trades(ts, symbol, side, qty, entry, exit, pnl, pnl_pct, hold_s, ...), or
-      - trades(pair, side, entry_ts, exit_ts, entry, exit, pnl, pnl_pct, hold_s)
-    Uses a compat view if present.
+    Streams trades from the engine store as CSV.
+    No business logic duplication; relies on engine.iter_trades()
+    which yields dicts with fields matching TRADES_HEADER.
     """
-    # Prefer compat view if present, but it may be stale/broken; defend against OperationalError
-    if table_exists("v_trades_compat"):
-        try:
-            rows = _fetch_all("SELECT * FROM v_trades_compat ORDER BY ts ASC")
-            if not rows:
-                return Response(
-                    content=_rows_to_csv(
-                        list(["ts", "symbol", "side", "qty", "entry", "exit", "pnl", "pnl_pct", "hold_s"]), []
-                    ),
-                    media_type="text/csv",
-                )
-            headers = list(rows[0].keys())
-            return Response(content=_rows_to_csv(headers, rows), media_type="text/csv")
-        except sqlite3.OperationalError:
-            # Fall through to explicit table queries below
-            pass
+    eng = getattr(request.app.state, "engine", None)
+    if eng is None:
+        raise HTTPException(status_code=503, detail="Engine unavailable")
 
-    # Else choose best available source
-    if table_exists("paper_trades"):
-        # Select everything and map defensively in Python to avoid SQL errors on missing columns
-        raw = _fetch_all("SELECT * FROM paper_trades ORDER BY ts ASC")
-        rows = []
-        for r in raw:
-            mapped = {
-                "ts": r.get("ts") or r.get("entry_ts") or r.get("timestamp"),
-                "symbol": r.get("symbol") or r.get("pair"),
-                "side": r.get("side"),
-                "qty": r.get("qty") or r.get("quantity"),
-                "entry": r.get("entry") or r.get("price") or r.get("entry_price"),
-                "exit": r.get("exit") or r.get("exit_price") or None,
-                "pnl": r.get("pnl") or r.get("pnl_usd") or 0,
-                "pnl_pct": r.get("pnl_pct") or 0,
-                "hold_s": r.get("hold_s") or 0,
-            }
-            rows.append(mapped)
-    elif table_exists("trades"):
-        raw = _fetch_all("SELECT * FROM trades ORDER BY COALESCE(entry_ts, ts) ASC")
-        rows = []
-        for r in raw:
-            mapped = {
-                "ts": r.get("entry_ts") or r.get("ts") or r.get("timestamp"),
-                "symbol": r.get("pair") or r.get("symbol"),
-                "side": r.get("side"),
-                "qty": r.get("qty") or r.get("quantity") or r.get("amount") or None,
-                "entry": r.get("entry") or r.get("price") or None,
-                "exit": r.get("exit") or r.get("exit_price") or None,
-                "pnl": r.get("pnl") or r.get("pnl_usd") or 0,
-                "pnl_pct": r.get("pnl_pct") or 0,
-                "hold_s": r.get("hold_s") or 0,
-            }
-            rows.append(mapped)
-    else:
-        raise HTTPException(status_code=404, detail="No trades table found")
+    def _gen():
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=TRADES_HEADER, extrasaction="ignore")
+        writer.writeheader()
+        yield output.getvalue()
+        output.seek(0)
+        output.truncate(0)
+        for row in eng.iter_trades():
+            writer.writerow(row)
+            yield output.getvalue()
+            output.seek(0)
+            output.truncate(0)
 
-    headers = ["ts", "symbol", "side", "qty", "entry", "exit", "pnl", "pnl_pct", "hold_s"]
-    return Response(content=_rows_to_csv(headers, rows), media_type="text/csv")
+    return StreamingResponse(_gen(), media_type="text/csv")
 
 
 @router.get("/decisions.csv")

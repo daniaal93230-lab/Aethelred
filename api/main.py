@@ -453,6 +453,15 @@ except Exception:
     # routes package optional; continue if not available
     pass
 
+try:
+    # Register train router (thin trigger endpoint)
+    from api.routes import train as _train_routes
+
+    app.include_router(_train_routes.router, tags=["train"])
+except Exception:
+    # It's fine if the train router isn't importable in some environments
+    pass
+
 # CORS (allow all for local UI clients)
 app.add_middleware(
     CORSMiddleware,
@@ -471,6 +480,31 @@ try:
     ensure_compat_views()
 except Exception as e:
     log.exception("Failed to ensure DB compat views: %s", e)
+
+
+@app.on_event("startup")
+async def _safe_startup():
+    """
+    Safe start rule:
+      1) If breaker is active, flatten immediately.
+      2) If env SAFE_FLATTEN_ON_START=1 then flatten once on startup.
+    """
+    try:
+        engine = getattr(app.state, "engine", None)
+        if engine is None:
+            log.warning("Engine missing on startup. Skipping safe start checks")
+            return
+        breakers = engine.breakers_view() if hasattr(engine, "breakers_view") else {}
+        breaker_active = bool(
+            breakers.get("kill_switch") or breakers.get("daily_loss_tripped") or breakers.get("manual_breaker")
+        )
+        env_request = os.getenv("SAFE_FLATTEN_ON_START", "0") == "1"
+        if breaker_active or env_request:
+            log.warning("Safe startup: breaker or env flag detected. Flattening all positions")
+            await engine.flatten_all(reason="safe_startup")
+    except Exception as e:
+        log.exception("Safe startup sequence failed: %s", e)
+
 
 # ML: stop distance regressor loader (lazy)
 STOP_MODEL_PATH = ROOT / "models" / "stop_distance_regressor_v1.pkl"
@@ -501,31 +535,7 @@ def _get_intent_model() -> IntentVeto:
 # See `api/routes/export.py` for /export/trades.csv and /export/decisions.csv implementations.
 
 
-@app.post("/train")
-def train_from_decisions():
-    """Lightweight in-process trainer: builds dataset from decision_log and stores a calibrated classifier."""
-    try:
-        import sqlite3
-        from core.ml.model import build_dataset, train_model
-
-        con = sqlite3.connect(str(DB_PATH))
-        cur = con.cursor()
-        cur.execute(
-            "SELECT ts,symbol,strategy,regime,signal,intent,size_usd,price,ml_p_up,ml_vote,veto,reasons,planned_stop,planned_tp,run_id FROM decision_log ORDER BY ts"
-        )
-        rows = cur.fetchall()
-        con.close()
-        X, y, meta = build_dataset(rows)
-        model, report = train_model(X, y)
-        # skip save if model is None (empty dataset)
-        if model is not None:
-            (ROOT / "models").mkdir(exist_ok=True)
-            from joblib import dump
-
-            dump(model, ROOT / "models" / "intent_clf.pkl")
-        return JSONResponse({"status": "ok", "n": meta.get("n", 0), "report": report})
-    except Exception as e:
-        return JSONResponse({"status": "error", "error": str(e)}, status_code=500)
+# Legacy in-process trainer was removed in favor of a dedicated train router in `api.routes.train`.
 
 
 class StopInferPayload(BaseModel):

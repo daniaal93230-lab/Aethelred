@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 import ccxt.async_support as ccxt  # type: ignore
 import pandas as pd
 from fastapi import FastAPI
+from utils.snapshot import write_runtime_snapshot
 
 # ---------------- Config (env with defaults) ----------------
 MODE = os.getenv("MODE", "PAPER")  # PAPER only in this module
@@ -193,6 +194,15 @@ async def _startup() -> None:
     if START_ENGINE:
         _engine = TradingEngine()
         asyncio.create_task(_engine.run())
+
+
+# after each completed cycle, persist runtime snapshot using the engine
+# app.state.engine must expose account_snapshot()
+def on_cycle_complete():
+    try:
+        write_runtime_snapshot(app.state.engine)
+    except Exception:
+        pass
 
 
 @app.get("/health")

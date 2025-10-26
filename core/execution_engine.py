@@ -52,6 +52,13 @@ class ExecutionEngine:
         # lazy-initialized strategy selector and decision logger (non-invasive)
         self._strategy_selector = None
         self._decision_logger = None
+        # lazy import for snapshot writer to avoid import cycles
+        try:
+            from utils.snapshot import write_runtime_snapshot as _wrs
+
+            self._wrs = _wrs
+        except Exception:
+            self._wrs = None
 
     def _flatten_symbol(self, symbol: str) -> None:
         """
@@ -104,6 +111,12 @@ class ExecutionEngine:
             )
         else:
             logger.info("🟡 No trade signal. Holding position.")
+        # write compact runtime snapshot for dashboard if available
+        try:
+            if getattr(self, "_wrs", None):
+                self._wrs(self)
+        except Exception:
+            pass
     def run_live(self, symbol="BTCUSDT", trade=False):
         """
         Runs live signal evaluation and (optionally) executes a trade.
@@ -570,12 +583,20 @@ class ExecutionEngine:
                     snap = {"ts": time.time(), "equity": float(equity_val), "cash": float(equity_val), "exposure_usd": 0.0, "positions": []}
                 else:
                     snap = {"ts": time.time(), **acct}
-            # Write to the shared runtime directory
+            # Write to the shared runtime directory via the centralized snapshot helper.
             try:
-                (RT_DIR).mkdir(parents=True, exist_ok=True)
-                (RT_DIR / "account_runtime.json").write_text(json.dumps(snap), encoding="utf-8")
+                from utils.snapshot import write_runtime_snapshot
+
+                # Provide the freshly computed snapshot as `extra` so the helper can
+                # write atomically even if the engine doesn't expose account_snapshot().
+                write_runtime_snapshot(self, extra=snap)
             except Exception:
-                pass
+                # Fallback to the previous best-effort file write if snapshot helper fails
+                try:
+                    (RT_DIR).mkdir(parents=True, exist_ok=True)
+                    (RT_DIR / "account_runtime.json").write_text(json.dumps(snap), encoding="utf-8")
+                except Exception:
+                    pass
             # Persist equity snapshot via core.persistence
             try:
                 if snap["equity"] > 0:

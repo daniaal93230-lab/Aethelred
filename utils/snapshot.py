@@ -1,49 +1,53 @@
 import json
-import os
-import tempfile
-from typing import Any, Dict
+from pathlib import Path
+from typing import Dict, Any, List
 
-RUNTIME_SNAPSHOT_PATH = os.getenv("ACCOUNT_RUNTIME_PATH", "runtime/account_runtime.json")
+SNAPSHOT_PATH = Path("account_runtime.json")
 
 
-def _atomic_write(path: str, data: Dict[str, Any]) -> None:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    fd, tmp = tempfile.mkstemp(prefix=".snap-", dir=os.path.dirname(path))
+def _position_view(pos) -> Dict[str, Any]:
+    # pos expected fields: symbol, qty, entry, side, mark
+    # mtm pnl percent computed as (mark - entry) / entry for long, inverse for short
+    entry = pos.get("entry")
+    mark = pos.get("mark")
+    side = pos.get("side")
+    pnl_pct = None
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False)
-        os.replace(tmp, path)
+        if entry and mark and float(entry) != 0.0:
+            delta = (float(mark) - float(entry)) / float(entry)
+            if side == "short":
+                delta = -delta
+            pnl_pct = round(delta * 100.0, 4)
     except Exception:
-        try:
-            os.remove(tmp)
-        finally:
-            raise
-
-
-def write_runtime_snapshot(account_overview: Dict[str, Any]) -> None:
-    """
-    Persist a small JSON the dashboard can poll quickly.
-    Expected keys inside account_overview:
-      equity_now, total_notional, positions_by_symbol, positions, pnl_unrealized_pct
-    """
-    payload = {
-        "equity_now": float(account_overview.get("equity_now", 0.0)),
-        "total_notional": float(account_overview.get("total_notional", 0.0)),
-        "pnl_unrealized_pct": float(account_overview.get("pnl_unrealized_pct", 0.0)),
-        "positions": account_overview.get("positions", []),
-        "ts": account_overview.get("ts"),
+        pnl_pct = None
+    return {
+        "symbol": pos.get("symbol"),
+        "qty": pos.get("qty"),
+        "entry": entry,
+        "side": side,
+        "mark": mark,
+        "mtm_pnl_pct": pnl_pct,
     }
-    _atomic_write(RUNTIME_SNAPSHOT_PATH, payload)
 
 
-# Backwards-compatible helper: previous code wrote equity and positions separately
-def write_runtime_snapshot_legacy(equity_usd: float, positions: list, extra: dict | None = None):
-    acct = {
-        "equity_now": float(equity_usd),
+def write_runtime_snapshot(obj, extra: Dict[str, Any] | None = None) -> None:
+    """
+    Preferred: pass an engine that implements account_snapshot().
+    Backward compatible: if obj is a dict, write it directly with mtm enrich when possible.
+    """
+    if hasattr(obj, "account_snapshot"):
+        acct = obj.account_snapshot()
+    elif isinstance(obj, dict):
+        acct = obj
+    else:
+        acct = {}
+    positions: List[Dict[str, Any]] = [_position_view(p) for p in acct.get("positions", [])]
+    snapshot = {
+        "ts": acct.get("ts"),
+        "equity_now": acct.get("equity_now"),
+        "total_notional_usd": acct.get("total_notional_usd"),
         "positions": positions,
-        "ts": extra.get("ts") if extra else None,
-        "total_notional": extra.get("total_notional") if extra else 0.0,
     }
     if extra:
-        acct.update(extra)
-    write_runtime_snapshot(acct)
+        snapshot.update(extra)
+    SNAPSHOT_PATH.write_text(json.dumps(snapshot, indent=2))
