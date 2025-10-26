@@ -462,6 +462,25 @@ except Exception:
     # It's fine if the train router isn't importable in some environments
     pass
 
+
+# Auto-attach a lightweight QADevEngine when QA_DEV_ENGINE or QA_MODE env var is set.
+@app.on_event("startup")
+async def _maybe_attach_qa_engine():
+    try:
+        if os.getenv("QA_DEV_ENGINE", "0") == "1" or os.getenv("QA_MODE", "0") == "1":
+            # import local QA engine implementation; guard in case ops package not present
+            try:
+                from ops.qa_dev_engine import QADevEngine
+
+                app.state.engine = QADevEngine()
+                log.info("Attached QADevEngine to app.state.engine (QA mode)")
+            except Exception:
+                log.exception("Failed to attach QADevEngine for QA mode")
+    except Exception:
+        # swallow errors to avoid blocking startup
+        pass
+
+
 # CORS (allow all for local UI clients)
 app.add_middleware(
     CORSMiddleware,

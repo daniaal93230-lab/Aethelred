@@ -8,11 +8,11 @@ Function Invoke-JsonPost {
   return Invoke-WebRequest -Method POST -Uri $Url -ContentType "application/json" -Body $json
 }
 
-Write-Host "Start engine in another terminal. Then press Enter to continue..."
+Write-Host "Ensure the API is started with QA enabled: set the env var QA_DEV_ENGINE=1 (or QA_MODE=1) before launching uvicorn. Then press Enter to continue..."
 Read-Host
 
-Write-Host "1) Open a small test position"
-Invoke-JsonPost "$Base/order/market" @{ symbol="BTCUSDT"; side="buy"; qty=0.001 } | Out-Null
+Write-Host "1) Trigger QA demo endpoint to open a tiny in-memory position"
+Invoke-JsonPost "$Base/demo/paper_quick_run" @{ symbol="BTCUSDT"; qty=0.001; price=100 } | Out-Null
 
 Write-Host "2) Verify health"
 Invoke-WebRequest "$Base/healthz" | Out-Null
