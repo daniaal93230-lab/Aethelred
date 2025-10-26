@@ -1,6 +1,15 @@
 {
-  "ts": null,
-  "equity_now": null,
-  "total_notional_usd": null,
-  "positions": []
+  "ts": 1761502260,
+  "equity_now": 10000.0,
+  "total_notional_usd": 0.1,
+  "positions": [
+    {
+      "symbol": "BTCUSDT",
+      "qty": 0.001,
+      "entry": 100.0,
+      "side": "long",
+      "mark": 100.0,
+      "mtm_pnl_pct": 0.0
+    }
+  ]
 }

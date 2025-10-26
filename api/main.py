@@ -467,15 +467,35 @@ except Exception:
 @app.on_event("startup")
 async def _maybe_attach_qa_engine():
     try:
-        if os.getenv("QA_DEV_ENGINE", "0") == "1" or os.getenv("QA_MODE", "0") == "1":
-            # import local QA engine implementation; guard in case ops package not present
+        # Never attach QA engine in live contexts
+        if os.getenv("LIVE", "0") == "1":
             try:
-                from ops.qa_dev_engine import QADevEngine
-
-                app.state.engine = QADevEngine()
-                log.info("Attached QADevEngine to app.state.engine (QA mode)")
+                log.info("LIVE=1 detected, skipping QADevEngine attach")
             except Exception:
-                log.exception("Failed to attach QADevEngine for QA mode")
+                pass
+            return None
+
+        want = os.getenv("QA_DEV_ENGINE", "0") == "1" or os.getenv("QA_MODE", "0") == "1"
+        if not want:
+            return None
+
+        # import local QA engine implementation; guard in case ops package not present
+        try:
+            from ops.qa_dev_engine import QADevEngine
+
+            eng = QADevEngine()
+            app.state.engine = eng
+            try:
+                log.warning("QADevEngine attached (QA_DEV_ENGINE or QA_MODE). Not for live trading.")
+            except Exception:
+                pass
+            return eng
+        except Exception as e:
+            try:
+                log.exception("Failed to attach QADevEngine: %s", e)
+            except Exception:
+                pass
+            return None
     except Exception:
         # swallow errors to avoid blocking startup
         pass

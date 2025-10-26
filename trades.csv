@@ -1,0 +1,2 @@
+ts_open,ts_close,symbol,side,qty,entry,exit,pnl,pnl_pct,fee_usd,slippage_bps,note
+1761502200,1761502260,BTCUSDT,long,0.001,100.0,100.0,0.0,0.0,0.0,0.0,demo
