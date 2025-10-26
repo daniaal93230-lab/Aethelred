@@ -237,17 +237,78 @@
           "demo"
         ],
         "summary": "Paper Quick Run",
-        "description": "Quick smoke test: opens tiny positions if allowed by RiskEngine, then closes them.\nReturns a compact summary for QA.",
+        "description": "QA demo route.\nIf the app has a QADevEngine attached at `app.state.engine`, open a tiny in-memory demo position and write a runtime snapshot.\nReturns a compact confirmation for quick verification.",
         "operationId": "paper_quick_run_demo_paper_quick_run_post",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "BTCUSDT",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "qty",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": 0.001,
+              "title": "Qty"
+            }
+          },
+          {
+            "name": "price",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": 100.0,
+              "title": "Price"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
                   "title": "Response Paper Quick Run Demo Paper Quick Run Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }

@@ -164,7 +164,7 @@
     },
     {
       "path": ".ruff_cache/0.14.2/3754106019521563112",
-      "size": 138,
+      "size": 175,
       "first_line": "",
       "docstring": null
     },
@@ -248,13 +248,13 @@
     },
     {
       "path": "api/main.py",
-      "size": 67583,
+      "size": 68315,
       "first_line": "# api/main.py",
       "docstring": null
     },
     {
       "path": "api/openapi.json",
-      "size": 33320,
+      "size": 34826,
       "first_line": "{",
       "docstring": null
     },
@@ -272,8 +272,8 @@
     },
     {
       "path": "api/routes/demo.py",
-      "size": 2666,
-      "first_line": "import time",
+      "size": 1597,
+      "first_line": "from __future__ import annotations",
       "docstring": null
     },
     {
@@ -913,6 +913,12 @@
       "docstring": null
     },
     {
+      "path": "ops/qa_dev_engine.py",
+      "size": 3332,
+      "first_line": "from __future__ import annotations",
+      "docstring": null
+    },
+    {
       "path": "pyproject.toml",
       "size": 952,
       "first_line": "[tool.ruff]",
@@ -920,7 +926,7 @@
     },
     {
       "path": "repo_index_compact.json",
-      "size": 39762,
+      "size": 40801,
       "first_line": "{",
       "docstring": null
     },
@@ -1040,7 +1046,7 @@
     },
     {
       "path": "scripts/accept_ops.ps1",
-      "size": 1173,
+      "size": 1294,
       "first_line": "param(",
       "docstring": null
     },
