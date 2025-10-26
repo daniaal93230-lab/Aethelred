@@ -104,7 +104,7 @@
     },
     {
       "path": ".ruff_cache/0.14.2/11638596181637876275",
-      "size": 517,
+      "size": 607,
       "first_line": "",
       "docstring": null
     },
@@ -134,7 +134,7 @@
     },
     {
       "path": ".ruff_cache/0.14.2/16405797324829307559",
-      "size": 661,
+      "size": 693,
       "first_line": "",
       "docstring": null
     },
@@ -146,7 +146,7 @@
     },
     {
       "path": ".ruff_cache/0.14.2/2200317804781333797",
-      "size": 413,
+      "size": 449,
       "first_line": "",
       "docstring": null
     },
@@ -217,6 +217,12 @@
       "docstring": null
     },
     {
+      "path": "account_runtime.json",
+      "size": 87,
+      "first_line": "{",
+      "docstring": null
+    },
+    {
       "path": "api/README.md",
       "size": 410,
       "first_line": "API module",
@@ -230,7 +236,7 @@
     },
     {
       "path": "api/app.py",
-      "size": 143,
+      "size": 421,
       "first_line": "from fastapi import FastAPI",
       "docstring": null
     },
@@ -242,19 +248,19 @@
     },
     {
       "path": "api/main.py",
-      "size": 67298,
+      "size": 67583,
       "first_line": "# api/main.py",
       "docstring": null
     },
     {
       "path": "api/openapi.json",
-      "size": 30369,
+      "size": 33320,
       "first_line": "{",
       "docstring": null
     },
     {
       "path": "api/paper_bot.py",
-      "size": 7664,
+      "size": 7956,
       "first_line": "from __future__ import annotations",
       "docstring": null
     },
@@ -272,14 +278,14 @@
     },
     {
       "path": "api/routes/export.py",
-      "size": 7800,
-      "first_line": "from fastapi import APIRouter, Response, HTTPException",
+      "size": 6889,
+      "first_line": "from fastapi import APIRouter, Response, HTTPException, Request",
       "docstring": null
     },
     {
       "path": "api/routes/ops.py",
-      "size": 639,
-      "first_line": "from fastapi import APIRouter",
+      "size": 2260,
+      "first_line": "from typing import Optional",
       "docstring": null
     },
     {
@@ -292,6 +298,12 @@
       "path": "api/routes/risk.py",
       "size": 768,
       "first_line": "from typing import Any, Dict",
+      "docstring": null
+    },
+    {
+      "path": "api/routes/train.py",
+      "size": 939,
+      "first_line": "from fastapi import APIRouter, HTTPException, Request",
       "docstring": null
     },
     {
@@ -548,7 +560,7 @@
     },
     {
       "path": "core/execution_engine.py",
-      "size": 28210,
+      "size": 29136,
       "first_line": "import time",
       "docstring": null
     },
@@ -908,7 +920,7 @@
     },
     {
       "path": "repo_index_compact.json",
-      "size": 39638,
+      "size": 39762,
       "first_line": "{",
       "docstring": null
     },
@@ -974,8 +986,8 @@
     },
     {
       "path": "runtime/news_items.json",
-      "size": 25165,
-      "first_line": "[{\"title\": \"JPMorgan reportedly plans to let clients borrow against their Bitcoin and Ether\", \"link\": \"https://cointelegraph.com/news/jpmorgan-bitcoin-ether-collateral-institutional-report?utm_source=",
+      "size": 27602,
+      "first_line": "[{\"title\": \"The next era of crypto belongs to decentralized markets\", \"link\": \"https://cointelegraph.com/news/crypto-belongs-to-decentralized-markets?utm_source=rss_feed&utm_medium=rss%3F_dc%3D1761499",
       "docstring": null
     },
     {
@@ -1024,6 +1036,18 @@
       "path": "scripts/README.md",
       "size": 386,
       "first_line": "Scripts",
+      "docstring": null
+    },
+    {
+      "path": "scripts/accept_ops.ps1",
+      "size": 1173,
+      "first_line": "param(",
+      "docstring": null
+    },
+    {
+      "path": "scripts/accept_ops.sh",
+      "size": 789,
+      "first_line": "#!/usr/bin/env bash",
       "docstring": null
     },
     {
@@ -1136,7 +1160,7 @@
     },
     {
       "path": "scripts/run_paper_quick.ps1",
-      "size": 1817,
+      "size": 1573,
       "first_line": "Param(",
       "docstring": null
     },
@@ -1168,6 +1192,12 @@
       "path": "scripts/train_stop_distance_regressor_v1.py",
       "size": 8556,
       "first_line": "#!/usr/bin/env python3",
+      "docstring": null
+    },
+    {
+      "path": "scripts/watchdog.py",
+      "size": 1639,
+      "first_line": "import time",
       "docstring": null
     },
     {
@@ -1351,6 +1381,12 @@
       "docstring": null
     },
     {
+      "path": "tests_api/test_ops_flatten_health.py",
+      "size": 1215,
+      "first_line": "from fastapi.testclient import TestClient",
+      "docstring": null
+    },
+    {
       "path": "tests_api/test_ops_flatten_http.py",
       "size": 730,
       "first_line": "from fastapi.testclient import TestClient",
@@ -1370,13 +1406,19 @@
     },
     {
       "path": "tests_api/test_runtime_json.py",
-      "size": 766,
-      "first_line": "import os",
+      "size": 797,
+      "first_line": "import json",
       "docstring": null
     },
     {
       "path": "tests_api/test_smoke_api.py",
       "size": 217,
+      "first_line": "from fastapi.testclient import TestClient",
+      "docstring": null
+    },
+    {
+      "path": "tests_api/test_train_endpoint.py",
+      "size": 595,
       "first_line": "from fastapi.testclient import TestClient",
       "docstring": null
     },
@@ -1472,7 +1514,7 @@
     },
     {
       "path": "utils/snapshot.py",
-      "size": 1745,
+      "size": 1677,
       "first_line": "import json",
       "docstring": null
     },

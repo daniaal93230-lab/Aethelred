@@ -120,6 +120,22 @@
         }
       }
     },
+    "/healthz": {
+      "get": {
+        "summary": "Healthz",
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/flatten": {
       "post": {
         "summary": "Flatten",
@@ -164,10 +180,10 @@
         }
       }
     },
-    "/healthz": {
+    "/risk/breaker": {
       "get": {
-        "summary": "Healthz",
-        "operationId": "healthz_healthz_get",
+        "summary": "Breaker View",
+        "operationId": "breaker_view_risk_breaker_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -178,21 +194,37 @@
             }
           }
         }
-      }
-    },
-    "/runtime_json": {
-      "get": {
-        "tags": [
-          "ops"
-        ],
-        "summary": "Runtime Json",
-        "operationId": "runtime_json_runtime_json_get",
+      },
+      "post": {
+        "summary": "Breaker Set",
+        "description": "Idempotent setter. Any None is ignored. Setting kill_switch True blocks new trades.\nclear_daily_loss True resets the tripped daily breaker after review.",
+        "operationId": "breaker_set_risk_breaker_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BreakerState"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -245,7 +277,7 @@
     "/export/trades.csv": {
       "get": {
         "summary": "Export Trades Csv",
-        "description": "Defensive exporter.\nWorks if DB has either:\n  - paper_trades(ts, symbol, side, qty, entry, exit, pnl, pnl_pct, hold_s, ...), or\n  - trades(pair, side, entry_ts, exit_ts, entry, exit, pnl, pnl_pct, hold_s)\nUses a compat view if present.",
+        "description": "Streams trades from the engine store as CSV.\nNo business logic duplication; relies on engine.iter_trades()\nwhich yields dicts with fields matching TRADES_HEADER.",
         "operationId": "export_trades_csv_export_trades_csv_get",
         "responses": {
           "200": {
@@ -299,15 +331,38 @@
     },
     "/train": {
       "post": {
-        "summary": "Train From Decisions",
-        "description": "Lightweight in-process trainer: builds dataset from decision_log and stores a calibrated classifier.",
-        "operationId": "train_from_decisions_train_post",
+        "tags": [
+          "train"
+        ],
+        "summary": "Trigger Train",
+        "description": "Thin trigger for ML training. No training logic here.\nDelegates to engine.orchestrator which enqueues work or signals a worker.\nIdempotent: repeated calls with the same job key should be safe.",
+        "operationId": "trigger_train_train_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrainRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -1040,6 +1095,45 @@
   },
   "components": {
     "schemas": {
+      "BreakerState": {
+        "properties": {
+          "kill_switch": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kill Switch"
+          },
+          "manual_breaker": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Breaker"
+          },
+          "clear_daily_loss": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clear Daily Loss"
+          }
+        },
+        "type": "object",
+        "title": "BreakerState"
+      },
       "FlattenReq": {
         "properties": {
           "mode": {
@@ -1131,6 +1225,28 @@
           "features"
         ],
         "title": "StopInferPayload"
+      },
+      "TrainRequest": {
+        "properties": {
+          "job": {
+            "type": "string",
+            "title": "Job",
+            "default": "default"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "title": "TrainRequest"
       },
       "ValidationError": {
         "properties": {
