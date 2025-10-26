@@ -104,7 +104,7 @@
     },
     {
       "path": ".ruff_cache/0.14.2/11638596181637876275",
-      "size": 607,
+      "size": 649,
       "first_line": "",
       "docstring": null
     },
@@ -248,7 +248,7 @@
     },
     {
       "path": "api/main.py",
-      "size": 68315,
+      "size": 68830,
       "first_line": "# api/main.py",
       "docstring": null
     },
@@ -992,8 +992,8 @@
     },
     {
       "path": "runtime/news_items.json",
-      "size": 27602,
-      "first_line": "[{\"title\": \"The next era of crypto belongs to decentralized markets\", \"link\": \"https://cointelegraph.com/news/crypto-belongs-to-decentralized-markets?utm_source=rss_feed&utm_medium=rss%3F_dc%3D1761499",
+      "size": 25091,
+      "first_line": "[{\"title\": \"US Treasury chief Bessent says 'substantial' trade framework with China reached\", \"link\": \"https://cointelegraph.com/news/bessent-substantial-trade-framework-china?utm_source=rss_feed&utm_",
       "docstring": null
     },
     {
@@ -1387,6 +1387,12 @@
       "docstring": null
     },
     {
+      "path": "tests_api/test_no_qa_in_live.py",
+      "size": 435,
+      "first_line": "from importlib import reload",
+      "docstring": null
+    },
+    {
       "path": "tests_api/test_ops_flatten_health.py",
       "size": 1215,
       "first_line": "from fastapi.testclient import TestClient",
@@ -1474,6 +1480,12 @@
       "path": "tools/seed_paper_state.py",
       "size": 953,
       "first_line": "import os",
+      "docstring": null
+    },
+    {
+      "path": "trades.csv",
+      "size": 156,
+      "first_line": "ts_open,ts_close,symbol,side,qty,entry,exit,pnl,pnl_pct,fee_usd,slippage_bps,note",
       "docstring": null
     },
     {
