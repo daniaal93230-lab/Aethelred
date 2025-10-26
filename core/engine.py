@@ -1,5 +1,23 @@
 # engine.py
 import pandas as pd
+from core.strategy.selector import StrategySelector
+from core.strategy.types import Signal, Side
+try:
+    from core.strategy.ma_crossover_adapter import MACrossoverAdapter
+except Exception:
+    MACrossoverAdapter = None  # engine still runs without it
+
+# Use drop-in wiring helpers (non-invasive). These live in a separate module
+# so callers can opt-in without forcing heavy imports at module import time.
+try:
+    from core.engine_strategy_wiring import make_strategy_selector, pick_and_log_strategy_signal
+except Exception:
+    make_strategy_selector = None
+    pick_and_log_strategy_signal = None
+try:
+    from core.strategy.regime_config import load_regime_map
+except Exception:
+    load_regime_map = None
 
 # ===== Common Config Defaults (can be overridden by brain) =====
 FEE_RATE = 0.001        # 0.10% per side
@@ -270,3 +288,43 @@ def build_signals(df: pd.DataFrame, name: str, params: dict) -> pd.DataFrame:
     if name not in STRATEGY_BUILDERS:
         raise ValueError(f"Unknown strategy: {name}")
     return STRATEGY_BUILDERS[name](df.copy(), **params)
+
+
+# NOTE: helper implementations were moved to `core.engine_strategy_wiring`.
+# If present, callers can use `make_strategy_selector()` and
+# `pick_and_log_strategy_signal(...)` to emit canonical decision rows.
+
+# --- Regime map loader wiring (for selector) ---
+class EngineWithRegimeMap:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Ensure a strategy selector exists (idempotent, non-invasive)
+        if not hasattr(self, "_selector") or self._selector is None:
+            # Load declarative regime map if present
+            if load_regime_map is not None:
+                try:
+                    default_regime, overrides = load_regime_map("config/selector.yaml")
+                except Exception:
+                    default_regime, overrides = ("unknown", {})
+            else:
+                default_regime, overrides = ("unknown", {})
+            self._selector = make_strategy_selector(default_regime, overrides)
+        # Persist on engine for easy access
+        if not hasattr(self, "symbol_regime_default"):
+            self.symbol_regime_default = default_regime
+        if not hasattr(self, "symbol_regime"):
+            self.symbol_regime = overrides
+
+    def sweep_symbol(self, symbol, o_arr, h_arr, l_arr, c_arr, v_arr, now_ts, *args, **kwargs):
+        try:
+            regime = self.symbol_regime.get(symbol, self.symbol_regime_default)
+        except Exception:
+            regime = self.symbol_regime_default
+        # ...existing code...
+
+    def process_symbol(self, symbol, market_state, now_ts, *args, **kwargs):
+        try:
+            regime = self.symbol_regime.get(symbol, self.symbol_regime_default)
+        except Exception:
+            regime = self.symbol_regime_default
+        # ...existing code...

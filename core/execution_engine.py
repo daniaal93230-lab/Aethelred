@@ -49,6 +49,9 @@ class ExecutionEngine:
             self._ml_model = load_model()
         except Exception:
             self._ml_model = None
+        # lazy-initialized strategy selector and decision logger (non-invasive)
+        self._strategy_selector = None
+        self._decision_logger = None
 
     def _flatten_symbol(self, symbol: str) -> None:
         """
@@ -130,6 +133,69 @@ class ExecutionEngine:
 
         # Compute regime and pick strategy by regime
         reg = compute_regime(df if df is not None else ohlcv)
+        # Emit a raw strategy signal for analytics/labeling using the new
+        # engine_strategy_wiring helpers. This is intentionally non-invasive
+        # and wrapped in try/except so it never affects runtime logic.
+        try:
+            if self._strategy_selector is None:
+                try:
+                    from core.engine_strategy_wiring import make_strategy_selector
+
+                    self._strategy_selector = make_strategy_selector()
+                except Exception:
+                    self._strategy_selector = None
+            if self._decision_logger is None:
+                # lightweight adapter exposing write(row) -> save_decision_row(row)
+                class _DecisionLogger:
+                    def write(self, r):
+                        try:
+                            from db.db_manager import save_decision_row
+
+                            save_decision_row(r)
+                        except Exception:
+                            try:
+                                logger.info("[RawSignal] save_decision_row failed", exc_info=True)
+                            except Exception:
+                                pass
+
+                self._decision_logger = _DecisionLogger()
+
+            # prepare OHLCV arrays expected by adapter
+            o_arr = h_arr = l_arr = c_arr = v_arr = []
+            if df is not None and not df.empty:
+                o_arr = df.get("open", []).tolist()
+                h_arr = df.get("high", []).tolist()
+                l_arr = df.get("low", []).tolist()
+                c_arr = df.get("close", []).tolist()
+                v_arr = df.get("vol", []).tolist() if "vol" in df.columns else [0] * len(c_arr)
+            elif isinstance(ohlcv, list) and ohlcv:
+                o_arr = [x[1] for x in ohlcv]
+                h_arr = [x[2] for x in ohlcv]
+                l_arr = [x[3] for x in ohlcv]
+                c_arr = [x[4] for x in ohlcv]
+                v_arr = [x[5] if len(x) > 5 else 0 for x in ohlcv]
+
+            if self._strategy_selector is not None:
+                try:
+                    from core.engine_strategy_wiring import pick_and_log_strategy_signal
+
+                    pick_and_log_strategy_signal(
+                        self._strategy_selector,
+                        symbol,
+                        reg.label,
+                        o_arr,
+                        h_arr,
+                        l_arr,
+                        c_arr,
+                        v_arr,
+                        int(time.time()),
+                        self._decision_logger,
+                    )
+                except Exception:
+                    # never let analytics emission break execution
+                    pass
+        except Exception:
+            pass
         strat_name, strat_fn = pick_by_regime(reg.label)
         try:
             _df = df

@@ -1,0 +1,6 @@
+defaults:
+  regime: trending
+overrides:
+  BTCUSDT: trending
+  ETHUSDT: mean_revert
+  SOLUSDT: breakout
