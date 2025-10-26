@@ -237,61 +237,18 @@
           "demo"
         ],
         "summary": "Paper Quick Run",
-        "description": "QA demo route.\nIf the app has a QADevEngine attached at `app.state.engine`, open a tiny in-memory demo position and write a runtime snapshot.\nReturns a compact confirmation for quick verification.",
+        "description": "QA demo route.\nIf the app has a QADevEngine attached at `app.state.engine`, open a tiny in-memory demo position and write a runtime snapshot.\nAlso append a demo trade record so `/export/trades.csv` contains at least one row for acceptance tests.",
         "operationId": "paper_quick_run_demo_paper_quick_run_post",
-        "parameters": [
-          {
-            "name": "symbol",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": "BTCUSDT",
-              "title": "Symbol"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoPayload"
+              }
             }
           },
-          {
-            "name": "qty",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": 0.001,
-              "title": "Qty"
-            }
-          },
-          {
-            "name": "price",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": 100.0,
-              "title": "Price"
-            }
-          }
-        ],
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1194,6 +1151,60 @@
         },
         "type": "object",
         "title": "BreakerState"
+      },
+      "DemoPayload": {
+        "properties": {
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol",
+            "default": "BTCUSDT"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side",
+            "default": "long"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qty",
+            "default": 0.001
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price",
+            "default": 100.0
+          }
+        },
+        "type": "object",
+        "title": "DemoPayload"
       },
       "FlattenReq": {
         "properties": {

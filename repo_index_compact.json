@@ -254,7 +254,7 @@
     },
     {
       "path": "api/openapi.json",
-      "size": 34826,
+      "size": 35063,
       "first_line": "{",
       "docstring": null
     },
@@ -272,7 +272,7 @@
     },
     {
       "path": "api/routes/demo.py",
-      "size": 1597,
+      "size": 2658,
       "first_line": "from __future__ import annotations",
       "docstring": null
     },
@@ -926,7 +926,7 @@
     },
     {
       "path": "repo_index_compact.json",
-      "size": 40801,
+      "size": 40977,
       "first_line": "{",
       "docstring": null
     },
