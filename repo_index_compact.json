@@ -32,7 +32,7 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "size": 2505,
+      "size": 2660,
       "first_line": "\ufeffname: Aethelred CI",
       "docstring": null
     },
@@ -904,6 +904,12 @@
       "path": "pyproject.toml",
       "size": 952,
       "first_line": "[tool.ruff]",
+      "docstring": null
+    },
+    {
+      "path": "repo_index_compact.json",
+      "size": 39638,
+      "first_line": "{",
       "docstring": null
     },
     {
