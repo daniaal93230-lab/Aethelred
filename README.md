@@ -54,6 +54,16 @@ CLI example (dev script):
 
 Artifacts are written to `models/intent_veto/model.pkl` and `model_meta.json` with the tuned decision threshold and validation ECE.
 
+### Paper-session retraining
+
+When `data/decisions.csv` and `data/trades.csv` exist, the `/train` endpoint will automatically derive labels from realized trade outcomes, perform balanced LogisticRegression + CalibratedClassifierCV, and tune threshold by ECE.
+
+**Acceptance targets:**
+- ECE < 3 % on validation
+- Balanced precision/recall
+- Artifacts written under `models/intent_veto/`
+- `core/ml_gate.py` logs `model_version` and uses tuned threshold at runtime
+
 ## Testing
 Run the test suite:
 

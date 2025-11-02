@@ -770,11 +770,16 @@ def train_intent_veto_endpoint(payload: dict):
         from ml.train_intent_veto import train_intent_veto as _train
 
         signals_csv = Path(payload.get("signals_csv", "data/decisions.csv"))
-        candles_csv = Path(payload.get("candles_csv", f"data/candles/{payload.get('symbol','BTCUSDT')}.csv"))
+        candles_csv = Path(payload.get("candles_csv", f"data/candles/{payload.get('symbol', 'BTCUSDT')}.csv"))
         horizon = int(payload.get("horizon", 12))
         symbol = str(payload.get("symbol", "BTCUSDT"))
         outdir = Path("models/intent_veto")
         res = _train(signals_csv, candles_csv, outdir, horizon=horizon, symbol=symbol)
+        # attach model version if present
+        from core.ml_gate import IntentVetoGate
+
+        gate = IntentVetoGate(model_dir=outdir)
+        res["model_version"] = gate.model_version
         return {"status": "ok", **res}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"train failed: {e}")
@@ -872,10 +877,11 @@ async def lifespan(app: FastAPI):
     finally:
         # Attempt to cancel the idle snapshot task if present
         try:
-            if globals().get("_idle_task"):
-                t = globals().get("_idle_task")
+            _idle = globals().get("_idle_task")
+            # type-check: ensure we have an asyncio.Task before calling cancel
+            if _idle is not None and isinstance(_idle, asyncio.Task):
                 try:
-                    t.cancel()
+                    _idle.cancel()
                 except Exception:
                     pass
         except Exception:
@@ -884,7 +890,7 @@ async def lifespan(app: FastAPI):
 
 # Attach lifespan to app router so FastAPI uses it instead of deprecated on_event
 try:
-    app.router.lifespan_context = lifespan  # type: ignore[attr-defined]
+    app.router.lifespan_context = lifespan
 except Exception:
     pass
 

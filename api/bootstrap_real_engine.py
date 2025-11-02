@@ -33,7 +33,7 @@ class EngineOrchestrator:
       iter_trades, enqueue_train, account_snapshot, realized_pnl_today_usd, trade_count_today
     """
 
-    def __init__(self, exch: Exchange, risk: RiskEngine, db: DBManager, clock):
+    def __init__(self, exch: Exchange, risk: RiskEngine, db: DBManager, clock=None):
         self._exch = exch
         self._risk = risk
         self._db = db

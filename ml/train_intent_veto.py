@@ -14,6 +14,9 @@ from .feature_pipeline import build_features, FeatureConfig
 from .labeler import build_labels, LabelConfig
 from .metrics import expected_calibration_error, tune_threshold_by_ece
 
+# new import
+from .dataset_builder import build_signals_outcomes, DatasetConfig
+
 
 def _ensure_symbol_column(df: pd.DataFrame, sym: str) -> pd.DataFrame:
     if "symbol" not in df.columns:
@@ -49,7 +52,16 @@ def train_intent_veto(
         cfg=LabelConfig(horizon=horizon),
     )
     if labels.empty:
-        raise RuntimeError("No labels built. Check input files and horizon.")
+        # Fallback: use trades.csv if available for signal↔outcome labels
+        trades_csv = Path("data/trades.csv")
+        if trades_csv.exists():
+            labels = build_signals_outcomes(
+                decisions_csv=signals_csv,
+                trades_csv=str(trades_csv),
+                cfg=DatasetConfig(horizon=horizon),
+            )
+        if labels.empty:
+            raise RuntimeError("No labels built from either candles or trades data.")
 
     # Align candles on label grid for feature building
     merged = labels.merge(

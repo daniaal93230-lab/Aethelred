@@ -31,7 +31,7 @@ async def trigger_train(req: TrainRequest, request: Request):
                 from ml.train_intent_veto import train_intent_veto as _train
 
                 signals_csv = Path(body.get("signals_csv"))
-                candles_csv = Path(body.get("candles_csv", f"data/candles/{body.get('symbol','BTCUSDT')}.csv"))
+                candles_csv = Path(body.get("candles_csv", f"data/candles/{body.get('symbol', 'BTCUSDT')}.csv"))
                 horizon = int(body.get("horizon", 12))
                 symbol = str(body.get("symbol", "BTCUSDT"))
                 outdir = Path(body.get("outdir", "models/intent_veto"))

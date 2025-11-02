@@ -25,6 +25,13 @@ class IntentVetoGate:
             self.meta = json.loads(meta_path.read_text())
 
     @property
+    def model_version(self) -> str:
+        if self.meta and "validation" in self.meta:
+            # Use checksum surrogate for version traceability
+            return f"v-{abs(hash(json.dumps(self.meta, sort_keys=True))) % (10**8)}"
+        return "v-none"
+
+    @property
     def threshold(self) -> float:
         if self.meta and "decision_threshold" in self.meta:
             return float(self.meta["decision_threshold"])
@@ -40,4 +47,7 @@ class IntentVetoGate:
     def allow(self, X: np.ndarray) -> np.ndarray:
         prob = self.predict_proba(X)
         t = self.threshold
-        return (prob >= t).astype(int)
+        decision = (prob >= t).astype(int)
+        # Log each batch decision with version tag
+        print(f"[MLGate] decision batch {len(decision)} using {self.model_version}, thr={t:.3f}")
+        return decision
