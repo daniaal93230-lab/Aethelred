@@ -52,3 +52,61 @@ jobs:
           else
             echo "No changes to commit"
           fi
+
+  schema-check:
+    name: Decisions schema endpoint check
+    runs-on: ubuntu-latest
+    env:
+      AETHELRED_ENV: prod
+      PORT: 8100
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install app deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-cache-dir -r requirements.txt || true
+          pip install --no-cache-dir uvicorn fastapi pyyaml
+      - name: Launch API (background)
+        run: |
+          python -m uvicorn api.main:app --host 127.0.0.1 --port ${PORT} --workers 1 &
+          echo $! > uvicorn.pid
+      - name: Wait for API to be ready
+        shell: bash
+        run: |
+          for i in {1..60}; do
+            if curl -fsS "http://127.0.0.1:${PORT}/export/decisions.schema.json" >/dev/null; then
+              echo "API is up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API did not become ready in time"
+          exit 1
+      - name: Fetch schema and validate
+        run: |
+          curl -fsS "http://127.0.0.1:${PORT}/export/decisions.schema.json" -o schema.json
+          python - <<'PY'
+          import json, sys
+          with open("schema.json","r",encoding="utf-8") as f:
+              s = json.load(f)
+          props = s.get("properties", {})
+          required = set(s.get("required", []))
+          must_have = {"ts","symbol","regime","strategy_name","signal_side"}
+          missing_props = [k for k in must_have if k not in props]
+          if missing_props:
+              print("Missing properties:", missing_props)
+              sys.exit(1)
+          if "enum" not in props.get("signal_side", {}):
+              print("signal_side has no enum")
+              sys.exit(1)
+          print("Schema looks OK")
+          PY
+      - name: Teardown API
+        if: always()
+        run: |
+          if [ -f uvicorn.pid ]; then kill $(cat uvicorn.pid) || true; fi
