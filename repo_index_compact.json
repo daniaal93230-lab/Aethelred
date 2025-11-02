@@ -104,7 +104,7 @@
     },
     {
       "path": ".ruff_cache/0.14.3/11638596181637876275",
-      "size": 697,
+      "size": 785,
       "first_line": "",
       "docstring": null
     },
@@ -242,7 +242,7 @@
     },
     {
       "path": "account_runtime.json",
-      "size": 150,
+      "size": 222,
       "first_line": "{",
       "docstring": null
     },
@@ -332,7 +332,7 @@
     },
     {
       "path": "api/routes/ops.py",
-      "size": 2500,
+      "size": 2660,
       "first_line": "from typing import Optional",
       "docstring": null
     },
@@ -620,7 +620,7 @@
     },
     {
       "path": "core/execution_engine.py",
-      "size": 29746,
+      "size": 29787,
       "first_line": "import time",
       "docstring": null
     },
@@ -860,7 +860,7 @@
     },
     {
       "path": "db/db_manager.py",
-      "size": 25378,
+      "size": 26703,
       "first_line": "import os, sqlite3, time, json",
       "docstring": null
     },
@@ -886,6 +886,12 @@
       "path": "db/migrations/005_trade_views.sql",
       "size": 134,
       "first_line": "create view if not exists v_trades as",
+      "docstring": null
+    },
+    {
+      "path": "db/migrations/2025_10_26_perf_views.sql",
+      "size": 580,
+      "first_line": "-- Example SQL views for realized pnl and trade count today",
       "docstring": null
     },
     {
@@ -1070,7 +1076,7 @@
     },
     {
       "path": "repo_index_compact.json",
-      "size": 47332,
+      "size": 47739,
       "first_line": "{",
       "docstring": null
     },
@@ -1579,6 +1585,12 @@
       "docstring": null
     },
     {
+      "path": "tests_api/test_healthz_shape.py",
+      "size": 695,
+      "first_line": "from fastapi.testclient import TestClient",
+      "docstring": null
+    },
+    {
       "path": "tests_api/test_insight_metrics_api.py",
       "size": 1317,
       "first_line": "import os",
@@ -1636,6 +1648,12 @@
       "path": "tests_api/test_smoke_api.py",
       "size": 217,
       "first_line": "from fastapi.testclient import TestClient",
+      "docstring": null
+    },
+    {
+      "path": "tests_api/test_snapshot_realized.py",
+      "size": 626,
+      "first_line": "from pathlib import Path",
       "docstring": null
     },
     {
@@ -1754,7 +1772,7 @@
     },
     {
       "path": "utils/snapshot.py",
-      "size": 2156,
+      "size": 2284,
       "first_line": "import json",
       "docstring": null
     },
