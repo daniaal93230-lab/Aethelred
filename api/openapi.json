@@ -387,6 +387,30 @@
         }
       }
     },
+    "/insight/metrics": {
+      "get": {
+        "tags": [
+          "insight"
+        ],
+        "summary": "Compute and return performance metrics JSON",
+        "description": "Returns a compact dict with Sharpe, Sortino, MaxDD, Win rate, Expectancy,\naverage exposure and average turnover computed from the journal DB.",
+        "operationId": "insight_metrics_insight_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Insight Metrics Insight Metrics Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ml/stop_distance": {
       "post": {
         "summary": "Ml Stop Distance",
