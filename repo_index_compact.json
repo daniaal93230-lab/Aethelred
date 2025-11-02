@@ -50,7 +50,7 @@
     },
     {
       "path": ".github/workflows/update_llm_artifacts.yml",
-      "size": 1579,
+      "size": 3612,
       "first_line": "name: Update LLM artifacts",
       "docstring": null
     },
@@ -1058,7 +1058,7 @@
     },
     {
       "path": "repo_index_compact.json",
-      "size": 46291,
+      "size": 47064,
       "first_line": "{",
       "docstring": null
     },
