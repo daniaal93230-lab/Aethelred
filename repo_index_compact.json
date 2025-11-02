@@ -296,7 +296,7 @@
     },
     {
       "path": "api/routes/insight.py",
-      "size": 2715,
+      "size": 3059,
       "first_line": "from __future__ import annotations",
       "docstring": null
     },
@@ -944,7 +944,7 @@
     },
     {
       "path": "repo_index_compact.json",
-      "size": 41808,
+      "size": 42107,
       "first_line": "{",
       "docstring": null
     },
