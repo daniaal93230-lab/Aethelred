@@ -23,11 +23,13 @@ async def healthz(request: Request):
     if eng is not None and hasattr(eng, "heartbeat"):
         try:
             hb = eng.heartbeat()
-            # normalize common fields
+            # normalize and enrich
             status["engine"] = {
                 "ok": hb.get("ok", True),
                 "positions_count": hb.get("positions_count", hb.get("positions", 0)),
                 "last_tick_ts": hb.get("last_tick_ts", hb.get("ts")),
+                "breakers": getattr(eng, "breakers_view", lambda: {})(),
+                "ts": getattr(eng, "account_snapshot", lambda: {"ts": None})().get("ts"),
             }
         except Exception as e:
             status["engine"] = f"error: {e}"

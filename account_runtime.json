@@ -2,5 +2,9 @@
   "ts": null,
   "equity_now": null,
   "total_notional_usd": null,
-  "positions": []
+  "positions": [],
+  "realized_pnl_today_usd": null,
+  "trade_count_today": null,
+  "written_at_iso": "2025-11-02T17:55:32.999382+00:00",
+  "version": 1
 }

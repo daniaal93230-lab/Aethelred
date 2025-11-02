@@ -115,7 +115,7 @@ class ExecutionEngine:
         # write compact runtime snapshot for dashboard if available
         try:
             if getattr(self, "_wrs", None):
-                # mark that fills/mtm changed since last snapshot
+                    # realized pnl today and counts are available from DB, snapshot writer will pull those
                 self._fills_since_last_snapshot = True
                 self._wrs(self)
                 self._fills_since_last_snapshot = False

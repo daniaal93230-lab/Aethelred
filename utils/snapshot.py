@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from typing import Dict, Any, List
+from datetime import datetime, timezone
 
 SNAPSHOT_PATH = Path("account_runtime.json")
 
@@ -55,6 +56,8 @@ def write_runtime_snapshot(obj, extra: Dict[str, Any] | None = None) -> None:
         "positions": positions,
         "realized_pnl_today_usd": realized_today,
         "trade_count_today": trade_count,
+        "written_at_iso": datetime.now(timezone.utc).isoformat(),
+        "version": 1,
     }
     if extra:
         snapshot.update(extra)

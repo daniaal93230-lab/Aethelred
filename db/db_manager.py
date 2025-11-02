@@ -388,6 +388,49 @@ class DBManager:
         except Exception:
             return None
 
+    # --- Utility clock ---
+    def now_ts(self) -> int:
+        import time
+
+        return int(time.time())
+
+    def iter_trades(self):
+        """
+        Iterate over trades. Replace with real DB cursor for large tables.
+        """
+        # conservative stub — yield nothing
+        yield from []
+
+    # --- Training jobs queue ---
+    def enqueue_job(self, kind: str, job: str, notes: str | None = None) -> dict:
+        """
+        Insert or upsert a training job ticket. Replace with real DB logic.
+        """
+        ticket = {"id": f"{kind.upper()}-{self.now_ts()}", "job": job, "notes": notes}
+        # TODO: persist
+        return ticket
+
+    # --- Performance summaries for today ---
+    def realized_pnl_today_usd(self) -> float:
+        """
+        Compute realized PnL today in USD. Replace stub with SQL view if available.
+        """
+        try:
+            # If you have a trades table with ts_close and pnl columns, aggregate there
+            # Example SQL kept in migrations. Here return 0.0 for stub.
+            return 0.0
+        except Exception:
+            return 0.0
+
+    def trade_count_today(self) -> int:
+        """
+        Count closed trades today. Replace stub with SQL view if available.
+        """
+        try:
+            return 0
+        except Exception:
+            return 0
+
 
 def save_equity_snapshot(equity: float, ts: int | None = None):
     init_db()
