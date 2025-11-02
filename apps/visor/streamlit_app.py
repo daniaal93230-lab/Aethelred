@@ -220,19 +220,10 @@ def main() -> None:
                 hide_index=True,
             )
 
-    # Auto refresh using supported API
-    st.caption("Visor live view")
-    from streamlit_autorefresh import st_autorefresh as _st_autorefresh  # optional helper if installed
-
-    try:
-        _st_autorefresh(interval=REFRESH_SECS * 1000, key="visor_autorefresh")
-    except Exception:
-        # Built-in minimal fallback
-        st.caption("Auto-refreshing...")
-        st.session_state.setdefault("_last_tick", time.time())
-        if time.time() - st.session_state["_last_tick"] >= REFRESH_SECS:
-            st.session_state["_last_tick"] = time.time()
-            st.rerun()
+    # Auto refresh with core Streamlit only
+    st.caption("Auto-refreshing...")
+    time.sleep(REFRESH_SECS)
+    st.rerun()
 
 
 if __name__ == "__main__":
