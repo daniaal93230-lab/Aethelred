@@ -347,6 +347,22 @@
         }
       }
     },
+    "/export/decisions.schema.json": {
+      "get": {
+        "summary": "Export Decisions Schema",
+        "operationId": "export_decisions_schema_export_decisions_schema_json_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/train": {
       "post": {
         "summary": "Train Intent Veto Endpoint",

@@ -86,7 +86,7 @@
     },
     {
       "path": ".pytest_cache/v/cache/nodeids",
-      "size": 2232,
+      "size": 2839,
       "first_line": "[",
       "docstring": null
     },
@@ -290,7 +290,7 @@
     },
     {
       "path": "api/openapi.json",
-      "size": 35963,
+      "size": 36395,
       "first_line": "{",
       "docstring": null
     },
@@ -314,7 +314,7 @@
     },
     {
       "path": "api/routes/export.py",
-      "size": 6889,
+      "size": 8229,
       "first_line": "from fastapi import APIRouter, Response, HTTPException, Request",
       "docstring": null
     },
@@ -553,6 +553,12 @@
       "docstring": null
     },
     {
+      "path": "config/regime_map.yaml",
+      "size": 251,
+      "first_line": "default_env: \"prod\"",
+      "docstring": null
+    },
+    {
       "path": "config/risk.yaml",
       "size": 929,
       "first_line": "version: 1",
@@ -590,13 +596,13 @@
     },
     {
       "path": "core/engine.py",
-      "size": 13740,
+      "size": 15453,
       "first_line": "# engine.py",
       "docstring": null
     },
     {
       "path": "core/engine_strategy_wiring.py",
-      "size": 1922,
+      "size": 3006,
       "first_line": "from __future__ import annotations",
       "docstring": null
     },
@@ -788,7 +794,7 @@
     },
     {
       "path": "core/strategy/regime_config.py",
-      "size": 1297,
+      "size": 2624,
       "first_line": "from __future__ import annotations",
       "docstring": null
     },
@@ -920,7 +926,7 @@
     },
     {
       "path": "docs/strategos.md",
-      "size": 1766,
+      "size": 2113,
       "first_line": "# Strategos: Strategy Interface and Raw Signal Logging",
       "docstring": null
     },
@@ -1052,7 +1058,7 @@
     },
     {
       "path": "repo_index_compact.json",
-      "size": 46134,
+      "size": 46291,
       "first_line": "{",
       "docstring": null
     },
@@ -1465,6 +1471,12 @@
       "docstring": null
     },
     {
+      "path": "tests/test_export_decisions_schema.py",
+      "size": 376,
+      "first_line": "from fastapi.testclient import TestClient",
+      "docstring": null
+    },
+    {
       "path": "tests/test_live_ohlcv.py",
       "size": 689,
       "first_line": "from bot.exchange import Exchange",
@@ -1483,6 +1495,12 @@
       "docstring": null
     },
     {
+      "path": "tests/test_regime_map_env.py",
+      "size": 831,
+      "first_line": "import os",
+      "docstring": null
+    },
+    {
       "path": "tests/test_sizing_vol.py",
       "size": 617,
       "first_line": "import math",
@@ -1498,6 +1516,18 @@
       "path": "tests/test_strategy_logic.py",
       "size": 1576,
       "first_line": "import random",
+      "docstring": null
+    },
+    {
+      "path": "tests/test_strategy_registry.py",
+      "size": 443,
+      "first_line": "from core.strategy import registry",
+      "docstring": null
+    },
+    {
+      "path": "tests/test_strategy_selector.py",
+      "size": 2028,
+      "first_line": "from typing import Any, Dict",
       "docstring": null
     },
     {
