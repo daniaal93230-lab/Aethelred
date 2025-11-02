@@ -12,7 +12,7 @@ import time
 from typing import Any, List, Optional, Tuple
 
 import pandas as pd
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from utils.logger import get_logger
@@ -716,6 +716,33 @@ def healthz():
         "db_present": Path(DB_PATH).exists(),
     }
     return {"status": "ok", "snapshot": snap}
+
+
+@app.post("/train")
+def train_intent_veto_endpoint(payload: dict):
+    """
+    Kick off training and write artifacts under models/intent_veto.
+    Body:
+        {
+            "signals_csv": "data/decisions.csv",
+            "candles_csv": "data/candles/BTCUSDT.csv",
+            "horizon": 12,
+            "symbol": "BTCUSDT"
+        }
+    """
+    try:
+        from pathlib import Path
+        from ml.train_intent_veto import train_intent_veto as _train
+
+        signals_csv = Path(payload.get("signals_csv", "data/decisions.csv"))
+        candles_csv = Path(payload.get("candles_csv", f"data/candles/{payload.get('symbol','BTCUSDT')}.csv"))
+        horizon = int(payload.get("horizon", 12))
+        symbol = str(payload.get("symbol", "BTCUSDT"))
+        outdir = Path("models/intent_veto")
+        res = _train(signals_csv, candles_csv, outdir, horizon=horizon, symbol=symbol)
+        return {"status": "ok", **res}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"train failed: {e}")
 
 
 @app.get("/db_path")

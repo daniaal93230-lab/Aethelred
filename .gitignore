@@ -61,3 +61,11 @@ config.env
 
 # generated index (too large)
 repo_index.json
+
+# Models and editor/test caches
+models/*
+!models/.gitkeep
+.ipynb_checkpoints
+.pytest_cache
+.venv
+__pycache__/
