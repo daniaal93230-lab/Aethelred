@@ -9,8 +9,22 @@ def load_fixture() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:")
     # The fixture references other SQL files using the sqlite3 CLI `.read` directive.
     # Read and concatenate the referenced SQL files so executescript() can run them in-memory.
-    base = os.path.join(ROOT, "fixtures")
-    fixture_path = os.path.join(base, "journal_sample.sql")
+    # Try a set of candidate locations so CI environments with different cwd layouts work
+    candidates = [
+        os.path.join(ROOT, "fixtures", "journal_sample.sql"),
+        os.path.join(os.getcwd(), "tests", "fixtures", "journal_sample.sql"),
+        os.path.join(os.getcwd(), "fixtures", "journal_sample.sql"),
+        os.path.join(os.path.dirname(ROOT), "fixtures", "journal_sample.sql"),
+        os.path.join(os.getenv("GITHUB_WORKSPACE", ""), "tests", "fixtures", "journal_sample.sql"),
+        os.path.join(os.getenv("GITHUB_WORKSPACE", ""), "fixtures", "journal_sample.sql"),
+    ]
+    fixture_path = None
+    for c in candidates:
+        if c and os.path.exists(c):
+            fixture_path = c
+            break
+    if fixture_path is None:
+        raise FileNotFoundError(f"Could not locate journal_sample.sql in candidates: {candidates}")
     script_parts = []
     with open(fixture_path, "r", encoding="utf-8") as fh:
         for line in fh:
@@ -22,13 +36,28 @@ def load_fixture() -> sqlite3.Connection:
                     ref = parts[1].strip()
                     # Resolve relative references against tests dir first, then repo root
                     repo_root = os.path.dirname(ROOT)
+                    # Candidate resolution order for referenced files
+                    ref_candidates = []
                     if os.path.isabs(ref):
-                        ref_path = ref
-                    else:
-                        ref_path = os.path.join(ROOT, ref)
-                    if not os.path.exists(ref_path):
-                        # try relative to repo root (e.g., db/journal_schema.sql)
-                        ref_path = os.path.join(repo_root, ref.lstrip("/\\"))
+                        ref_candidates.append(ref)
+                    # relative to tests dir
+                    ref_candidates.append(os.path.join(ROOT, ref))
+                    # relative to cwd/tests
+                    ref_candidates.append(os.path.join(os.getcwd(), ref))
+                    # relative to repo root
+                    ref_candidates.append(os.path.join(repo_root, ref.lstrip("/\\")))
+                    # relative to GITHUB_WORKSPACE if present
+                    gw = os.getenv("GITHUB_WORKSPACE", "")
+                    if gw:
+                        ref_candidates.append(os.path.join(gw, ref.lstrip("/\\")))
+
+                    ref_path = None
+                    for rc in ref_candidates:
+                        if rc and os.path.exists(rc):
+                            ref_path = rc
+                            break
+                    if ref_path is None:
+                        raise FileNotFoundError(f"Referenced SQL file not found: {ref} (tried {ref_candidates})")
                     with open(ref_path, "r", encoding="utf-8") as rf:
                         script_parts.append(rf.read())
                 continue
