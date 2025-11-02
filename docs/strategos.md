@@ -59,5 +59,19 @@ At init the engine reads env `AETHELRED_ENV` (default prod), loads the map, and 
 ### Schema for ML consumers
 `/export/decisions.schema.json` serves a JSON Schema that mirrors `DECISIONS_HEADER`. Consumers can validate that CSVs include and type fields correctly.
 
+## Example row
+See `docs/examples/decision_row.json` for a single coalesced record that matches the canonical schema. This is suitable for onboarding ML pipelines and for unit test fixtures.
+
+## Handy scripts
+You can optionally pull decisions locally for inspection:
+
+```bash
+python scripts/pull_decisions.py --host http://127.0.0.1:8080 --out exports_download
+```
+This will save:
+- `exports_download/decisions.csv`
+- `exports_download/decisions.schema.json`
+```
+
 ## Tests
 Add deterministic tests on canned OHLCV. Avoid I/O. Keep calculations pure.

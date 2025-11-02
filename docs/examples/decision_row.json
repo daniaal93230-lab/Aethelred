@@ -1,0 +1,18 @@
+
+{
+  "ts": 1730546400.000,
+  "symbol": "BTCUSDT",
+  "regime": "by_name",
+  "strategy_name": "ma_crossover",
+  "signal_side": "BUY",
+  "signal_strength": 0.62,
+  "signal_stop_hint": 67950.5,
+  "signal_ttl": 1,
+  "final_action": "BUY",
+  "final_size": 0.25,
+  "veto_ml": false,
+  "veto_risk": false,
+  "veto_reason": null,
+  "price": 68410.2,
+  "note": "sweep-001"
+}

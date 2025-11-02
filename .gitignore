@@ -70,3 +70,6 @@ models/*
 .venv
 __pycache__/
 .streamlit/
+
+# local exports pulled from API
+exports_download/
