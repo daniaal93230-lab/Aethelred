@@ -49,14 +49,24 @@ def insight_metrics() -> Dict[str, Any]:
     """
     # access global app instance through router dependency - FastAPI injects request
     # we avoid a hard dependency here by opening the db via resolved path
+    # Attempt to read the Starlette request (and its app.state) from
+    # `starlette_context.context.data` if that package is present. Be
+    # defensive: avoid attribute access on None and keep types narrow so
+    # static checkers (mypy) don't complain.
+    app_state = None
     try:
-        # FastAPI passes request implicitly, but we keep the signature simple
-        # so we fetch it from context using a trick via starlette context if present
-        from starlette_context import context as _ctx  # type: ignore
-
-        app_state = getattr(_ctx.data.get("request"), "app", None).state if _ctx and "request" in _ctx.data else None
+        import starlette_context as _sc
     except Exception:
-        app_state = None
+        _sc = None
+
+    if _sc is not None:
+        ctx = getattr(_sc, "context", None)
+        if ctx is not None and isinstance(getattr(ctx, "data", None), dict):
+            req = ctx.data.get("request")
+            if req is not None:
+                app = getattr(req, "app", None)
+                if app is not None and hasattr(app, "state"):
+                    app_state = getattr(app, "state")
 
     db_path = _resolve_db_path(app_state)
     if not db_path:
