@@ -2,7 +2,8 @@ import os
 import sqlite3
 from analytics.metrics import compute_all_metrics, reconstruct_round_trips
 
-ROOT = os.path.dirname(os.path.dirname(__file__))
+# Use the tests directory as the base for fixtures so CI runners find them
+ROOT = os.path.dirname(__file__)
 
 def load_fixture() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:")
@@ -19,14 +20,15 @@ def load_fixture() -> sqlite3.Connection:
                 parts = line.split(None, 1)
                 if len(parts) == 2:
                     ref = parts[1].strip()
-                    # Resolve relative references against repository root
+                    # Resolve relative references against tests dir first, then repo root
+                    repo_root = os.path.dirname(ROOT)
                     if os.path.isabs(ref):
                         ref_path = ref
                     else:
                         ref_path = os.path.join(ROOT, ref)
                     if not os.path.exists(ref_path):
-                        # try without leading slash
-                        ref_path = os.path.join(ROOT, ref.lstrip("/\\"))
+                        # try relative to repo root (e.g., db/journal_schema.sql)
+                        ref_path = os.path.join(repo_root, ref.lstrip("/\\"))
                     with open(ref_path, "r", encoding="utf-8") as rf:
                         script_parts.append(rf.read())
                 continue
