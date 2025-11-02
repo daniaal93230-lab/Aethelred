@@ -462,6 +462,15 @@ except Exception:
     # It's fine if the train router isn't importable in some environments
     pass
 
+try:
+    # Register insight router which exposes consolidated performance metrics
+    from api.routes import insight as _insight_routes
+
+    app.include_router(_insight_routes.router)
+except Exception:
+    # Non-fatal if insight route can't be imported (e.g., lightweight test env)
+    pass
+
 
 # Auto-attach a lightweight QADevEngine when QA_DEV_ENGINE or QA_MODE env var is set.
 @app.on_event("startup")
@@ -509,6 +518,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Optional: set a default journal_db_path on app.state if not provided by the orchestrator
+try:
+    default_db = os.getenv("JOURNAL_DB_PATH", "").strip()
+    if not default_db:
+        candidate = os.path.join("data", "journal.db")
+        if os.path.exists(candidate):
+            default_db = candidate
+    if default_db:
+        setattr(app.state, "journal_db_path", default_db)
+except Exception:
+    pass
 
 # Logger and settings
 log = get_logger("api")
