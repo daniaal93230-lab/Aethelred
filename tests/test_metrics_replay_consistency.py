@@ -6,64 +6,177 @@ from analytics.metrics import compute_all_metrics, reconstruct_round_trips
 ROOT = os.path.dirname(__file__)
 
 def load_fixture() -> sqlite3.Connection:
+    # To avoid brittle filesystem assumptions on CI, inline the SQL schema, views,
+    # and sample inserts directly. This keeps the test hermetic and fast.
     conn = sqlite3.connect(":memory:")
-    # The fixture references other SQL files using the sqlite3 CLI `.read` directive.
-    # Read and concatenate the referenced SQL files so executescript() can run them in-memory.
-    # Try a set of candidate locations so CI environments with different cwd layouts work
-    candidates = [
-        os.path.join(ROOT, "fixtures", "journal_sample.sql"),
-        os.path.join(os.getcwd(), "tests", "fixtures", "journal_sample.sql"),
-        os.path.join(os.getcwd(), "fixtures", "journal_sample.sql"),
-        os.path.join(os.path.dirname(ROOT), "fixtures", "journal_sample.sql"),
-        os.path.join(os.getenv("GITHUB_WORKSPACE", ""), "tests", "fixtures", "journal_sample.sql"),
-        os.path.join(os.getenv("GITHUB_WORKSPACE", ""), "fixtures", "journal_sample.sql"),
-    ]
-    fixture_path = None
-    for c in candidates:
-        if c and os.path.exists(c):
-            fixture_path = c
-            break
-    if fixture_path is None:
-        raise FileNotFoundError(f"Could not locate journal_sample.sql in candidates: {candidates}")
-    script_parts = []
-    with open(fixture_path, "r", encoding="utf-8") as fh:
-        for line in fh:
-            line = line.rstrip("\n")
-            if line.strip().startswith(".read"):
-                # .read <path> -> include content of referenced file
-                parts = line.split(None, 1)
-                if len(parts) == 2:
-                    ref = parts[1].strip()
-                    # Resolve relative references against tests dir first, then repo root
-                    repo_root = os.path.dirname(ROOT)
-                    # Candidate resolution order for referenced files
-                    ref_candidates = []
-                    if os.path.isabs(ref):
-                        ref_candidates.append(ref)
-                    # relative to tests dir
-                    ref_candidates.append(os.path.join(ROOT, ref))
-                    # relative to cwd/tests
-                    ref_candidates.append(os.path.join(os.getcwd(), ref))
-                    # relative to repo root
-                    ref_candidates.append(os.path.join(repo_root, ref.lstrip("/\\")))
-                    # relative to GITHUB_WORKSPACE if present
-                    gw = os.getenv("GITHUB_WORKSPACE", "")
-                    if gw:
-                        ref_candidates.append(os.path.join(gw, ref.lstrip("/\\")))
+    journal_schema = '''
+PRAGMA foreign_keys = ON;
 
-                    ref_path = None
-                    for rc in ref_candidates:
-                        if rc and os.path.exists(rc):
-                            ref_path = rc
-                            break
-                    if ref_path is None:
-                        raise FileNotFoundError(f"Referenced SQL file not found: {ref} (tried {ref_candidates})")
-                    with open(ref_path, "r", encoding="utf-8") as rf:
-                        script_parts.append(rf.read())
-                continue
-            script_parts.append(line + "\n")
+CREATE TABLE IF NOT EXISTS decisions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts              REAL NOT NULL,
+    symbol          TEXT NOT NULL,
+    regime          TEXT,
+    strategy_name   TEXT,
+    signal_side     TEXT,
+    signal_strength REAL,
+    signal_stop_hint REAL,
+    signal_ttl      INTEGER,
+    final_action    TEXT,
+    final_size      REAL,
+    veto_ml         INTEGER DEFAULT 0,
+    veto_risk       INTEGER DEFAULT 0,
+    veto_reason     TEXT,
+    price           REAL,
+    note            TEXT
+);
 
-    conn.executescript("\n".join(script_parts))
+CREATE INDEX IF NOT EXISTS idx_decisions_ts ON decisions(ts);
+CREATE INDEX IF NOT EXISTS idx_decisions_symbol_ts ON decisions(symbol, ts);
+
+CREATE TABLE IF NOT EXISTS fills (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts              REAL NOT NULL,
+    symbol          TEXT NOT NULL,
+    side            TEXT NOT NULL,
+    qty             REAL NOT NULL,
+    price           REAL NOT NULL,
+    fee_usd         REAL DEFAULT 0.0,
+    slippage_bps    REAL DEFAULT 0.0,
+    order_id        TEXT,
+    decision_id     INTEGER,
+    FOREIGN KEY(decision_id) REFERENCES decisions(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_fills_symbol_ts ON fills(symbol, ts);
+CREATE INDEX IF NOT EXISTS idx_fills_ts ON fills(ts);
+
+CREATE TABLE IF NOT EXISTS positions (
+    symbol              TEXT PRIMARY KEY,
+    side                TEXT NOT NULL,
+    qty                 REAL NOT NULL,
+    entry_price         REAL NOT NULL,
+    entry_ts            REAL NOT NULL,
+    last_update_ts      REAL NOT NULL,
+    realized_pnl_usd    REAL DEFAULT 0.0,
+    mtm_pnl_usd         REAL DEFAULT 0.0,
+    mtm_pnl_pct         REAL DEFAULT 0.0
+);
+
+CREATE INDEX IF NOT EXISTS idx_positions_side ON positions(side);
+
+CREATE TABLE IF NOT EXISTS equity_snapshots (
+    ts              REAL PRIMARY KEY,
+    equity_usd      REAL NOT NULL,
+    cash_usd        REAL NOT NULL,
+    exposure_usd    REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_equity_ts ON equity_snapshots(ts);
+
+CREATE TABLE IF NOT EXISTS symbol_exposure (
+    ts              REAL NOT NULL,
+    symbol          TEXT NOT NULL,
+    notional_usd    REAL NOT NULL,
+    PRIMARY KEY (ts, symbol)
+);
+
+CREATE INDEX IF NOT EXISTS idx_symbol_exposure_sym_ts ON symbol_exposure(symbol, ts);
+'''
+
+    views_sql = '''
+CREATE VIEW IF NOT EXISTS v_daily_equity AS
+WITH snaps AS (
+    SELECT
+        date(ts, 'unixepoch') AS day,
+        ts,
+        equity_usd
+    FROM equity_snapshots
+),
+day_open AS (
+    SELECT day, MIN(ts) AS open_ts
+    FROM snaps
+    GROUP BY day
+),
+day_close AS (
+    SELECT day, MAX(ts) AS close_ts
+    FROM snaps
+    GROUP BY day
+),
+open_equity AS (
+    SELECT s.day, s.equity_usd AS equity_open
+    FROM snaps s
+    JOIN day_open o ON s.day = o.day AND s.ts = o.open_ts
+),
+close_equity AS (
+    SELECT s.day, s.equity_usd AS equity_close
+    FROM snaps s
+    JOIN day_close c ON s.day = c.day AND s.ts = c.close_ts
+)
+SELECT
+    o.day,
+    o.equity_open,
+    c.equity_close,
+    (c.equity_close - o.equity_open) AS pnl_usd,
+    CASE
+        WHEN o.equity_open != 0 THEN (c.equity_close - o.equity_open) / o.equity_open
+        ELSE NULL
+    END AS ret
+FROM open_equity o
+JOIN close_equity c ON o.day = c.day
+ORDER BY o.day ASC;
+
+CREATE VIEW IF NOT EXISTS v_symbol_turnover AS
+SELECT
+    date(ts, 'unixepoch') AS day,
+    symbol,
+    SUM(qty * price) AS gross_notional_usd,
+    SUM(qty) AS gross_qty
+FROM fills
+GROUP BY day, symbol
+ORDER BY day, symbol;
+
+CREATE VIEW IF NOT EXISTS v_daily_exposure AS
+SELECT
+    date(ts, 'unixepoch') AS day,
+    AVG(exposure_usd) AS avg_exposure_usd
+FROM equity_snapshots
+GROUP BY day
+ORDER BY day;
+
+CREATE VIEW IF NOT EXISTS v_symbol_stats AS
+SELECT
+    symbol,
+    COUNT(*) AS fills_count,
+    SUM(CASE WHEN side = 'buy' THEN 1 ELSE 0 END) AS buys,
+    SUM(CASE WHEN side = 'sell' THEN 1 ELSE 0 END) AS sells,
+    MAX(ts) AS last_fill_ts,
+    (SELECT price FROM fills f2 WHERE f2.symbol = f.symbol ORDER BY ts DESC LIMIT 1) AS last_price
+FROM fills f
+GROUP BY symbol;
+'''
+
+    sample_inserts = '''
+INSERT INTO decisions(ts, symbol, regime, strategy_name, signal_side, final_action, final_size, price)
+VALUES
+(1730000000, 'BTCUSDT', 'baseline', 'rsi_mean_revert', 'buy', 'buy', 0.01, 60000.0),
+(1730003600, 'BTCUSDT', 'baseline', 'rsi_mean_revert', 'sell', 'sell', 0.01, 60600.0);
+
+INSERT INTO fills(ts, symbol, side, qty, price, fee_usd, slippage_bps, decision_id)
+VALUES
+(1730000005, 'BTCUSDT', 'buy', 0.010, 60000.0, 0.5, 1.2, 1),
+(1730007200, 'BTCUSDT', 'sell', 0.010, 60600.0, 0.5, -0.8, 2);
+
+INSERT INTO equity_snapshots(ts, equity_usd, cash_usd, exposure_usd) VALUES
+(1729996800, 100000.0, 100000.0, 0.0),
+(1730000100, 100000.0, 100000.0, 600.0),
+(1730039400, 100060.0, 100060.0, 0.0),
+(1730083200, 100060.0, 100060.0, 0.0),
+(1730112000, 100060.0, 100060.0, 0.0);
+'''
+
+    full = "\n".join([journal_schema, views_sql, sample_inserts])
+    conn.executescript(full)
     return conn
 
 def test_replay_consistency():
