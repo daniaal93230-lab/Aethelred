@@ -1,0 +1,11 @@
+default_env: "prod"
+envs:
+  prod:
+    default_strategy: "ma_crossover"
+    overrides:
+      BTCUSDT: "ma_crossover"
+      ETHUSDT: "rsi_mean_revert"
+      SOLUSDT: "donchian_breakout"
+  paper:
+    default_strategy: "rsi_mean_revert"
+    overrides: {}

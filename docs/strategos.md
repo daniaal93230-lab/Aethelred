@@ -40,17 +40,24 @@ If the runtime logs in two stages, exporter coalesces rows by `(ts, symbol)` kee
 Use `StrategySelector` to pick one strategy per symbol per regime. Unknown regimes fall back safely. Register overrides as needed.
 
 ### Declarative regime map
-Place a YAML file at `config/selector.yaml`:
+Place an environment-keyed YAML at `config/regime_map.yaml`:
 ```yaml
-defaults:
-    regime: trending
-overrides:
-    BTCUSDT: trending
-    ETHUSDT: mean_revert
-    SOLUSDT: breakout
+default_env: "prod"
+envs:
+    prod:
+        default_strategy: "ma_crossover"
+        overrides:
+            BTCUSDT: "ma_crossover"
+            ETHUSDT: "rsi_mean_revert"
+            SOLUSDT: "donchian_breakout"
+    paper:
+        default_strategy: "rsi_mean_revert"
+        overrides: {}
 ```
-The engine loads this on init, setting `engine.symbol_regime_default` and `engine.symbol_regime`. During the sweep it uses
-`symbol_regime.get(symbol, symbol_regime_default)` to select a strategy via the selector.
+At init the engine reads env `AETHELRED_ENV` (default prod), loads the map, and for each symbol picks the named strategy through the selector. No code edits needed to change choices.
+
+### Schema for ML consumers
+`/export/decisions.schema.json` serves a JSON Schema that mirrors `DECISIONS_HEADER`. Consumers can validate that CSVs include and type fields correctly.
 
 ## Tests
 Add deterministic tests on canned OHLCV. Avoid I/O. Keep calculations pure.

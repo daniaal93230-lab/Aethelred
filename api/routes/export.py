@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Response, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 import sqlite3
 import csv
 import io
@@ -187,3 +187,32 @@ def export_decisions_csv():
         row = bucket[key]
         w.writerow([row[k] for k in DECISIONS_HEADER])
     return Response(content=sio.getvalue(), media_type="text/csv")
+
+
+@router.get("/decisions.schema.json")
+def export_decisions_schema():
+    schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Aethelred Decisions CSV",
+        "type": "object",
+        "properties": {
+            "ts": {"type": ["number", "string"]},
+            "symbol": {"type": "string"},
+            "regime": {"type": "string"},
+            "strategy_name": {"type": "string"},
+            "signal_side": {"type": "string", "enum": ["BUY", "SELL", "HOLD"]},
+            "signal_strength": {"type": ["number", "null"], "minimum": 0.0, "maximum": 1.0},
+            "signal_stop_hint": {"type": ["number", "null"]},
+            "signal_ttl": {"type": ["integer", "null"], "minimum": 0},
+            "final_action": {"type": ["string", "null"], "enum": ["BUY", "SELL", "HOLD", None]},
+            "final_size": {"type": ["number", "null"]},
+            "veto_ml": {"type": ["boolean", "null"]},
+            "veto_risk": {"type": ["boolean", "null"]},
+            "veto_reason": {"type": ["string", "null"]},
+            "price": {"type": ["number", "null"]},
+            "note": {"type": ["string", "null"]},
+        },
+        "required": DECISIONS_HEADER[:5],  # minimally ensure leading identifiers
+        "additionalProperties": True,
+    }
+    return JSONResponse(schema)

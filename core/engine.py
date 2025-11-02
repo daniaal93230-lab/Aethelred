@@ -1,4 +1,5 @@
 # engine.py
+import os
 import pandas as pd
 from core.strategy.selector import StrategySelector
 from core.strategy.types import Signal, Side
@@ -10,14 +11,23 @@ except Exception:
 # Use drop-in wiring helpers (non-invasive). These live in a separate module
 # so callers can opt-in without forcing heavy imports at module import time.
 try:
-    from core.engine_strategy_wiring import make_strategy_selector, pick_and_log_strategy_signal
+    from core.engine_strategy_wiring import (
+        make_strategy_selector,
+        pick_and_log_strategy_signal,
+        pick_and_log_strategy_signal_by_name,
+    )
 except Exception:
     make_strategy_selector = None
     pick_and_log_strategy_signal = None
+    pick_and_log_strategy_signal_by_name = None
 try:
-    from core.strategy.regime_config import load_regime_map
+    from core.strategy.regime_config import load_regime_map_env
 except Exception:
-    load_regime_map = None
+    load_regime_map_env = None
+try:
+    from core.strategy.registry import default_registry
+except Exception:
+    default_registry = None
 
 # ===== Common Config Defaults (can be overridden by brain) =====
 FEE_RATE = 0.001        # 0.10% per side
@@ -300,31 +310,59 @@ class EngineWithRegimeMap:
         super().__init__(*args, **kwargs)
         # Ensure a strategy selector exists (idempotent, non-invasive)
         if not hasattr(self, "_selector") or self._selector is None:
-            # Load declarative regime map if present
-            if load_regime_map is not None:
+            self._selector = make_strategy_selector() if make_strategy_selector is not None else StrategySelector()
+        # Register name-based strategies (if available)
+        if default_registry is not None:
+            for name, strat in default_registry().items():
                 try:
-                    default_regime, overrides = load_regime_map("config/selector.yaml")
+                    self._selector.register_name(name, strat)
                 except Exception:
-                    default_regime, overrides = ("unknown", {})
-            else:
-                default_regime, overrides = ("unknown", {})
-            self._selector = make_strategy_selector(default_regime, overrides)
+                    pass
+        # Load declarative regime map keyed by environment if present
+        env = os.environ.get("AETHELRED_ENV", "prod")
+        if load_regime_map_env is not None:
+            try:
+                default_strategy, name_overrides = load_regime_map_env("config/regime_map.yaml", env)
+            except Exception:
+                default_strategy, name_overrides = ("null", {})
+        else:
+            default_strategy, name_overrides = ("null", {})
         # Persist on engine for easy access
-        if not hasattr(self, "symbol_regime_default"):
-            self.symbol_regime_default = default_regime
-        if not hasattr(self, "symbol_regime"):
-            self.symbol_regime = overrides
+        if not hasattr(self, "symbol_strategy_name_default"):
+            self.symbol_strategy_name_default = default_strategy
+        if not hasattr(self, "symbol_strategy_name"):
+            self.symbol_strategy_name = name_overrides
 
     def sweep_symbol(self, symbol, o_arr, h_arr, l_arr, c_arr, v_arr, now_ts, *args, **kwargs):
         try:
-            regime = self.symbol_regime.get(symbol, self.symbol_regime_default)
+            sname = self.symbol_strategy_name.get(symbol, self.symbol_strategy_name_default)
         except Exception:
-            regime = self.symbol_regime_default
+            sname = self.symbol_strategy_name_default
+        # Emit the canonical raw-signal row (decision-aligned fields) by name
+        if pick_and_log_strategy_signal_by_name is not None:
+            pick_and_log_strategy_signal_by_name(
+                selector=self._selector,
+                strategy_name=sname,
+                symbol=symbol,
+                o_arr=o_arr, h_arr=h_arr, l_arr=l_arr, c_arr=c_arr, v_arr=v_arr,
+                now_ts=now_ts,
+                decision_logger=self.decision_log,
+            )
         # ...existing code...
 
     def process_symbol(self, symbol, market_state, now_ts, *args, **kwargs):
         try:
-            regime = self.symbol_regime.get(symbol, self.symbol_regime_default)
+            sname = self.symbol_strategy_name.get(symbol, self.symbol_strategy_name_default)
         except Exception:
-            regime = self.symbol_regime_default
+            sname = self.symbol_strategy_name_default
+        if pick_and_log_strategy_signal_by_name is not None:
+            pick_and_log_strategy_signal_by_name(
+                selector=self._selector,
+                strategy_name=sname,
+                symbol=symbol,
+                o_arr=market_state.get("o", []), h_arr=market_state.get("h", []),
+                l_arr=market_state.get("l", []), c_arr=market_state.get("c", []), v_arr=market_state.get("v", []),
+                now_ts=now_ts,
+                decision_logger=self.decision_log,
+            )
         # ...existing code...
