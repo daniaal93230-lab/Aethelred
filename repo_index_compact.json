@@ -56,7 +56,7 @@
     },
     {
       "path": ".gitignore",
-      "size": 758,
+      "size": 770,
       "first_line": "\ufeff# env & caches",
       "docstring": null
     },
@@ -207,6 +207,12 @@
     {
       "path": ".ruff_cache/0.14.3/7822531232637135943",
       "size": 112,
+      "first_line": "",
+      "docstring": null
+    },
+    {
+      "path": ".ruff_cache/0.14.3/8934466943597251918",
+      "size": 87,
       "first_line": "",
       "docstring": null
     },
@@ -365,6 +371,12 @@
       "size": 439,
       "first_line": "{",
       "docstring": null
+    },
+    {
+      "path": "apps/visor/streamlit_app.py",
+      "size": 5978,
+      "first_line": "\"\"\"",
+      "docstring": "Visor: minimal truth UI for Aethelred \n Env:\n  VISOR_API_BASE   Base URL of the running API, default http://127.0.0.1:8080\nEndpoints used:\n  GET {VISOR_API_BASE}/healthz\n  GET {VISOR_API_BASE}/runtime/account_runtime.json \n Expected runtime/account_runtime.json shape (robust to missing keys):\n{\n  \"heartbeat_ts\": \"2025-10-26T18:22:15.123Z\",\n  \"equity\": [\n    {\"ts\": \"2025-10-26T18:20:00Z\", \"equity\": 100000.0},\n    {\"ts\": \"2025-10-26T18:21:00Z\", \"equity\": 100250.4},\n    ...\n  ],\n  \"positions\": [\n    {\n      \"s..."
     },
     {
       "path": "backtest_strategy.py",
@@ -907,6 +919,12 @@
       "docstring": null
     },
     {
+      "path": "docs/visor.md",
+      "size": 838,
+      "first_line": "# Aethelred Visor",
+      "docstring": null
+    },
+    {
       "path": "eth_metrics.csv",
       "size": 628,
       "first_line": "ts,exchange,symbol,interval,strategy,signal,price,bars_used,ann_return,ann_vol,sharpe_ann,max_drawdown,win_rate_bar,profit_factor_bar,trade_count,avg_bar_return,paper_equity",
@@ -1022,13 +1040,13 @@
     },
     {
       "path": "pyproject.toml",
-      "size": 952,
+      "size": 1111,
       "first_line": "[tool.ruff]",
       "docstring": null
     },
     {
       "path": "repo_index_compact.json",
-      "size": 42107,
+      "size": 44926,
       "first_line": "{",
       "docstring": null
     },
@@ -1276,6 +1294,18 @@
       "path": "scripts/run_retrain_nightly.ps1",
       "size": 1872,
       "first_line": "# run_retrain_nightly.ps1",
+      "docstring": null
+    },
+    {
+      "path": "scripts/run_visor.ps1",
+      "size": 315,
+      "first_line": "param(",
+      "docstring": null
+    },
+    {
+      "path": "scripts/run_visor.sh",
+      "size": 310,
+      "first_line": "#!/usr/bin/env bash",
       "docstring": null
     },
     {
