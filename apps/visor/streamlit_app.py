@@ -40,7 +40,8 @@ import streamlit as st
 
 API_BASE = os.getenv("VISOR_API_BASE", "http://127.0.0.1:8080")
 HEALTHZ_URL = f"{API_BASE}/healthz"
-RUNTIME_URL = f"{API_BASE}/runtime/account_runtime.json"
+RUNTIME_URL = f"{API_BASE}/runtime/account_runtime.json"  # may 404 on some builds
+METRICS_URL = f"{API_BASE}/metrics_json"  # fallback source for liveness/KPIs
 REFRESH_SECS = int(os.getenv("VISOR_REFRESH_SECS", "2"))
 TIMEOUT = float(os.getenv("VISOR_HTTP_TIMEOUT", "2.5"))
 
@@ -79,6 +80,8 @@ def parse_positions(runtime: Optional[Dict[str, Any]]) -> pd.DataFrame:
     rows: List[Dict[str, Any]] = []
     if runtime and isinstance(runtime.get("positions"), list):
         for p in runtime["positions"]:
+            sel = p.get("selector") or {}
+            strategy = sel.get("strategy_name") or p.get("strategy_name")
             rows.append(
                 {
                     "symbol": p.get("symbol", ""),
@@ -87,9 +90,10 @@ def parse_positions(runtime: Optional[Dict[str, Any]]) -> pd.DataFrame:
                     "entry": p.get("entry", None),
                     "mark": p.get("mark", None),
                     "PnL%": p.get("unrealized_pct", None),
+                    "strategy": strategy,
                 }
             )
-    df = pd.DataFrame(rows, columns=["symbol", "side", "qty", "entry", "mark", "PnL%"])
+    df = pd.DataFrame(rows, columns=["symbol", "side", "qty", "entry", "mark", "PnL%", "strategy"])
     # Simple numeric cleanup
     for c in ["qty", "entry", "mark", "PnL%"]:
         if c in df.columns:
@@ -105,13 +109,16 @@ def breaker_chip(healthz: Optional[Dict[str, Any]]) -> str:
     if not healthz:
         return "status: UNKNOWN"
     status = str(healthz.get("status", "unknown")).upper()
-    kill = healthz.get("kill_switch", False)
+    # tolerate both root-level and nested engine keys
+    kill = bool(healthz.get("kill_switch", False))
     daily = None
-    try:
-        breakers = healthz.get("breakers", {})
-        daily = breakers.get("daily_loss", None)
-    except Exception:
-        daily = None
+    # new shape seen: healthz["engine"]["breakers"]["daily_loss_tripped"]
+    eng = healthz.get("engine") or {}
+    b = (healthz.get("breakers") or {}) or eng.get("breakers") or {}
+    if "daily_loss" in b:
+        daily = bool(b.get("daily_loss"))
+    elif "daily_loss_tripped" in b:
+        daily = bool(b.get("daily_loss_tripped"))
     bits = [f"status: {status}"]
     if kill:
         bits.append("KILL=ON")
@@ -120,6 +127,20 @@ def breaker_chip(healthz: Optional[Dict[str, Any]]) -> str:
     elif daily is False:
         bits.append("DAILY_BREAKER=OK")
     return " | ".join(bits)
+
+
+def extract_kpis(healthz: Optional[Dict[str, Any]], runtime: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Return {'realized_pnl_today_usd': float|None, 'trade_count_today': int|None} from either source."""
+    out = {"realized_pnl_today_usd": None, "trade_count_today": None}
+    if runtime:
+        out["realized_pnl_today_usd"] = runtime.get("realized_pnl_today_usd", out["realized_pnl_today_usd"])
+        out["trade_count_today"] = runtime.get("trade_count_today", out["trade_count_today"])
+    if healthz:
+        eng = healthz.get("engine") or {}
+        for k in out.keys():
+            if out[k] is None and k in eng:
+                out[k] = eng.get(k)
+    return out
 
 
 def main() -> None:
@@ -136,6 +157,17 @@ def main() -> None:
         st.caption(f"API: {API_BASE}")
     healthz = fetch_json(HEALTHZ_URL)
     runtime = fetch_json(RUNTIME_URL)
+    # optional fallback: if runtime JSON is not served, try metrics to keep the page useful
+    if not runtime:
+        _metrics = fetch_json(METRICS_URL)  # not rendered directly, but proves API is alive
+        if _metrics and isinstance(_metrics, dict):
+            # metrics_json shape may carry small slices we can map into runtime for kpis
+            runtime = runtime or {}
+            # attach lightweight equity/positions if present
+            if "positions" not in runtime and "positions" in _metrics:
+                runtime["positions"] = _metrics.get("positions")
+            if "equity" not in runtime and "equity" in _metrics:
+                runtime["equity"] = _metrics.get("equity")
 
     with cols[1]:
         st.metric("Refresh", f"{REFRESH_SECS}s", help="Auto refresh cadence")
@@ -150,6 +182,12 @@ def main() -> None:
         elif healthz and healthz.get("last_heartbeat_ts"):
             hb = healthz.get("last_heartbeat_ts")
         st.markdown(f"**Last heartbeat**: {hb or 'unknown'}")
+
+    # KPIs (realized PnL + trade count) using either runtime or healthz.engine
+    kpis = extract_kpis(healthz, runtime)
+    with cols[4] if len(cols) > 4 else st.container():
+        st.metric("Realized PnL (today)", f"${kpis.get('realized_pnl_today_usd') or 0:.2f}")
+        st.metric("Trades (today)", f"{kpis.get('trade_count_today') or 0}")
 
     st.divider()
 
@@ -182,14 +220,19 @@ def main() -> None:
                 hide_index=True,
             )
 
-    # Auto refresh
+    # Auto refresh using supported API
     st.caption("Visor live view")
-    st.experimental_rerun  # type: ignore[attr-defined]
-    # Use autorefresh after rendering so user sees a stable frame
-    st_autorefresh = st.empty()
-    st_autorefresh.write("")  # placeholder
-    time.sleep(REFRESH_SECS)
-    st.experimental_rerun()
+    from streamlit_autorefresh import st_autorefresh as _st_autorefresh  # optional helper if installed
+
+    try:
+        _st_autorefresh(interval=REFRESH_SECS * 1000, key="visor_autorefresh")
+    except Exception:
+        # Built-in minimal fallback
+        st.caption("Auto-refreshing...")
+        st.session_state.setdefault("_last_tick", time.time())
+        if time.time() - st.session_state["_last_tick"] >= REFRESH_SECS:
+            st.session_state["_last_tick"] = time.time()
+            st.rerun()
 
 
 if __name__ == "__main__":
