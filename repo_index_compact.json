@@ -86,7 +86,7 @@
     },
     {
       "path": ".pytest_cache/v/cache/nodeids",
-      "size": 2161,
+      "size": 2232,
       "first_line": "[",
       "docstring": null
     },
@@ -97,97 +97,103 @@
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.2/1127600864467113360",
+      "path": ".ruff_cache/0.14.3/1127600864467113360",
       "size": 93,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.2/11638596181637876275",
+      "path": ".ruff_cache/0.14.3/11638596181637876275",
       "size": 649,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.2/12947006564008525681",
+      "path": ".ruff_cache/0.14.3/12947006564008525681",
       "size": 84,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.2/13113192207449778328",
+      "path": ".ruff_cache/0.14.3/13113192207449778328",
       "size": 175,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.2/15387219469415748884",
+      "path": ".ruff_cache/0.14.3/15387219469415748884",
       "size": 102,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.2/1572007642514256731",
+      "path": ".ruff_cache/0.14.3/1572007642514256731",
       "size": 87,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.2/16405797324829307559",
+      "path": ".ruff_cache/0.14.3/16405797324829307559",
       "size": 693,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.2/16686246387925838939",
+      "path": ".ruff_cache/0.14.3/16686246387925838939",
       "size": 285,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.2/2200317804781333797",
+      "path": ".ruff_cache/0.14.3/17052952824662009193",
+      "size": 80,
+      "first_line": "",
+      "docstring": null
+    },
+    {
+      "path": ".ruff_cache/0.14.3/2200317804781333797",
       "size": 449,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.2/2387240623249400781",
+      "path": ".ruff_cache/0.14.3/2387240623249400781",
       "size": 135,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.2/2795729012206064471",
+      "path": ".ruff_cache/0.14.3/2795729012206064471",
       "size": 109,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.2/3754106019521563112",
+      "path": ".ruff_cache/0.14.3/3754106019521563112",
       "size": 175,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.2/4515496761311577799",
+      "path": ".ruff_cache/0.14.3/4515496761311577799",
       "size": 203,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.2/6445456710033260170",
+      "path": ".ruff_cache/0.14.3/6445456710033260170",
       "size": 206,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.2/7797079289912585377",
+      "path": ".ruff_cache/0.14.3/7797079289912585377",
       "size": 108,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.2/7822531232637135943",
+      "path": ".ruff_cache/0.14.3/7822531232637135943",
       "size": 112,
       "first_line": "",
       "docstring": null
@@ -221,6 +227,12 @@
       "size": 87,
       "first_line": "{",
       "docstring": null
+    },
+    {
+      "path": "analytics/metrics.py",
+      "size": 8625,
+      "first_line": "\"\"\"",
+      "docstring": "Pure stdlib analytics over the journal DB.\nNo pandas dependency. SQLite only."
     },
     {
       "path": "api/README.md",
@@ -926,7 +938,7 @@
     },
     {
       "path": "repo_index_compact.json",
-      "size": 40977,
+      "size": 41323,
       "first_line": "{",
       "docstring": null
     },
@@ -1318,6 +1330,12 @@
       "path": "tests/test_live_ohlcv.py",
       "size": 689,
       "first_line": "from bot.exchange import Exchange",
+      "docstring": null
+    },
+    {
+      "path": "tests/test_metrics_replay_consistency.py",
+      "size": 6288,
+      "first_line": "import os",
       "docstring": null
     },
     {
