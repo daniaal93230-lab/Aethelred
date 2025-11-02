@@ -152,7 +152,7 @@
     },
     {
       "path": ".ruff_cache/0.14.3/17923447209750609491",
-      "size": 217,
+      "size": 256,
       "first_line": "",
       "docstring": null
     },
@@ -176,7 +176,7 @@
     },
     {
       "path": ".ruff_cache/0.14.3/316209595474699999",
-      "size": 120,
+      "size": 165,
       "first_line": "",
       "docstring": null
     },
@@ -224,7 +224,7 @@
     },
     {
       "path": "README.md",
-      "size": 1910,
+      "size": 2374,
       "first_line": "# Aethelred",
       "docstring": null
     },
@@ -272,7 +272,7 @@
     },
     {
       "path": "api/bootstrap_real_engine.py",
-      "size": 4609,
+      "size": 4614,
       "first_line": "\"\"\"",
       "docstring": "Bootstrap the real engine and attach it to FastAPI for uvicorn --factory.\nUsage:\n    uvicorn api.bootstrap_real_engine:create_app --host 127.0.0.1 --port 8080\nEnv:\n    LIVE=1                to prevent QA engine auto attach\n    SAFE_FLATTEN_ON_START optional safety on startup\n    SNAPSHOT_IDLE_SEC     optional idle snapshot loop interval (default 15)"
     },
@@ -290,7 +290,7 @@
     },
     {
       "path": "api/main.py",
-      "size": 72672,
+      "size": 72940,
       "first_line": "# api/main.py",
       "docstring": null
     },
@@ -698,7 +698,7 @@
     },
     {
       "path": "core/ml_gate.py",
-      "size": 1331,
+      "size": 1782,
       "first_line": "from __future__ import annotations",
       "docstring": null
     },
@@ -1021,6 +1021,12 @@
       "docstring": null
     },
     {
+      "path": "ml/dataset_builder.py",
+      "size": 1942,
+      "first_line": "from __future__ import annotations",
+      "docstring": null
+    },
+    {
       "path": "ml/feature_pipeline.py",
       "size": 4108,
       "first_line": "from __future__ import annotations",
@@ -1040,7 +1046,7 @@
     },
     {
       "path": "ml/train_intent_veto.py",
-      "size": 4521,
+      "size": 4986,
       "first_line": "from __future__ import annotations",
       "docstring": null
     },
@@ -1082,7 +1088,7 @@
     },
     {
       "path": "repo_index_compact.json",
-      "size": 48262,
+      "size": 48803,
       "first_line": "{",
       "docstring": null
     },
@@ -1696,6 +1702,12 @@
       "path": "tests_ml/__init__.py",
       "size": 66,
       "first_line": "# Marks tests_ml as a package so pytest can discover it reliably.",
+      "docstring": null
+    },
+    {
+      "path": "tests_ml/test_ml_ece_threshold.py",
+      "size": 1229,
+      "first_line": "import json",
       "docstring": null
     },
     {
