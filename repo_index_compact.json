@@ -793,6 +793,12 @@
       "docstring": null
     },
     {
+      "path": "core/strategy/registry.py",
+      "size": 757,
+      "first_line": "from __future__ import annotations",
+      "docstring": null
+    },
+    {
       "path": "core/strategy/rsi_mean_revert.py",
       "size": 1347,
       "first_line": "from __future__ import annotations",
@@ -800,7 +806,7 @@
     },
     {
       "path": "core/strategy/selector.py",
-      "size": 1188,
+      "size": 2653,
       "first_line": "from __future__ import annotations",
       "docstring": null
     },
@@ -1046,7 +1052,7 @@
     },
     {
       "path": "repo_index_compact.json",
-      "size": 44926,
+      "size": 46134,
       "first_line": "{",
       "docstring": null
     },
