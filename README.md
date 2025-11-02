@@ -71,6 +71,10 @@ pytest -q tests_ml
 
 ```powershell
 setx LIVE 1
+rem Example Postgres DSN
+setx DB_URL "postgres://user:pass@localhost:5432/aethelred"
+rem Run migrations once
+python scripts/run_migrations.py
 uvicorn api.bootstrap_real_engine:create_app --host 127.0.0.1 --port 8080 --reload
 ```
 

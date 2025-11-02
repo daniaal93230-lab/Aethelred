@@ -1,10 +1,11 @@
 """
 Bootstrap the real engine and attach it to FastAPI for uvicorn --factory.
 Usage:
-  uvicorn api.bootstrap_real_engine:create_app --host 127.0.0.1 --port 8080
+    uvicorn api.bootstrap_real_engine:create_app --host 127.0.0.1 --port 8080
 Env:
-  LIVE=1                to ensure QA engine cannot attach
-  SAFE_FLATTEN_ON_START optional safety on startup
+    LIVE=1                to prevent QA engine auto attach
+    SAFE_FLATTEN_ON_START optional safety on startup
+    SNAPSHOT_IDLE_SEC     optional idle snapshot loop interval (default 15)
 """
 
 from __future__ import annotations
@@ -17,7 +18,9 @@ from api.main import app as _app
 from db.db_manager import DBManager
 from risk.engine import RiskEngine
 from core.risk_config import get_risk_cfg
-from bot.exchange import Exchange  # your real exchange adapter
+from bot.exchange import Exchange
+
+IDLE_SNAPSHOT_SEC = int(os.getenv("SNAPSHOT_IDLE_SEC", "15") or "15")
 
 log = logging.getLogger("bootstrap")
 
@@ -115,13 +118,18 @@ class EngineOrchestrator:
 
 
 def create_app() -> FastAPI:
-    os.environ["LIVE"] = os.environ.get("LIVE", "1")
-    # Build dependencies
+    os.environ["LIVE"] = os.getenv("LIVE", "1")
     db = DBManager()
     risk = RiskEngine(get_risk_cfg())
     exch = Exchange(db=db, risk=risk)
-    engine = EngineOrchestrator(exch=exch, risk=risk, db=db, clock=None)
-    # Attach engine to FastAPI app
+    engine = EngineOrchestrator(exch=exch, risk=risk, db=db)
     _app.state.engine = engine
-    log.info("Real EngineOrchestrator attached to app.state.engine")
+    log.info("Real engine attached to app.state.engine")
+    # start idle snapshot loop via api.main’s helper
+    try:
+        from api.main import start_idle_snapshot_loop
+
+        start_idle_snapshot_loop(_app, interval_sec=IDLE_SNAPSHOT_SEC)
+    except Exception as e:
+        log.warning("Idle snapshot loop not started: %s", e)
     return _app

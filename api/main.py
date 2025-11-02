@@ -5,6 +5,8 @@ import io
 import json
 import math
 import sqlite3, csv
+import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import os
@@ -473,7 +475,6 @@ except Exception:
 
 
 # Auto-attach a lightweight QADevEngine when QA_DEV_ENGINE or QA_MODE env var is set.
-@app.on_event("startup")
 async def _maybe_attach_qa_engine():
     try:
         # Never attach QA engine in live contexts
@@ -542,7 +543,6 @@ except Exception as e:
     log.exception("Failed to ensure DB compat views: %s", e)
 
 
-@app.on_event("startup")
 async def _safe_startup():
     """
     Safe start rule:
@@ -568,6 +568,41 @@ async def _safe_startup():
 
 # ML: stop distance regressor loader (lazy)
 STOP_MODEL_PATH = ROOT / "models" / "stop_distance_regressor_v1.pkl"
+_idle_task: asyncio.Task | None = None
+
+
+def start_idle_snapshot_loop(app: FastAPI, interval_sec: int = 15):
+    """
+    Periodic snapshot while idle, so the dashboard stays fresh even without fills.
+    Uses write_runtime_snapshot if an engine is attached.
+    """
+    global _idle_task
+
+    async def _loop():
+        from utils.snapshot import write_runtime_snapshot
+
+        while True:
+            try:
+                eng = getattr(app.state, "engine", None)
+                if eng is not None:
+                    write_runtime_snapshot(eng)
+            except Exception:
+                pass
+            await asyncio.sleep(max(5, int(interval_sec)))
+
+    if _idle_task is None or _idle_task.done():
+        _idle_task = asyncio.create_task(_loop())
+        log.info("Idle snapshot loop started at %ss", interval_sec)
+
+
+async def _startup_idle_loop():
+    try:
+        interval = int(os.getenv("SNAPSHOT_IDLE_SEC", "15") or "15")
+    except Exception:
+        interval = 15
+    start_idle_snapshot_loop(app, interval_sec=interval)
+
+
 _stop_model: Optional[StopDistanceRegressor] = None
 _intent_model: Optional[IntentVeto] = None
 
@@ -750,7 +785,6 @@ def db_path():
     return {"db_path": str(DB_PATH.resolve())}
 
 
-@app.on_event("startup")
 async def _startup_news_loop():
     """Background task to fetch RSS, score sentiment, and write a sizing multiplier."""
     try:
@@ -809,6 +843,50 @@ async def _startup_news_loop():
 
     if os.getenv("ENABLE_DAILY_REPORT", "1").lower() not in ("0", "false", "no"):
         asyncio.create_task(_daily_report_loop())
+
+
+# Lifespan handler for startup tasks (replaces deprecated on_event startup hooks)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # run the legacy startup helpers in order; each is resilient on its own
+    try:
+        await _maybe_attach_qa_engine()
+    except Exception:
+        pass
+    try:
+        await _safe_startup()
+    except Exception:
+        pass
+    try:
+        await _startup_idle_loop()
+    except Exception:
+        pass
+    try:
+        await _startup_news_loop()
+    except Exception:
+        pass
+    try:
+        yield
+    finally:
+        # Attempt to cancel the idle snapshot task if present
+        try:
+            if globals().get("_idle_task"):
+                t = globals().get("_idle_task")
+                try:
+                    t.cancel()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+
+# Attach lifespan to app router so FastAPI uses it instead of deprecated on_event
+try:
+    app.router.lifespan_context = lifespan  # type: ignore[attr-defined]
+except Exception:
+    pass
 
 
 @app.get("/report/daily")

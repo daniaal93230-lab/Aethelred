@@ -30,6 +30,8 @@ async def healthz(request: Request):
                 "last_tick_ts": hb.get("last_tick_ts", hb.get("ts")),
                 "breakers": getattr(eng, "breakers_view", lambda: {})(),
                 "ts": getattr(eng, "account_snapshot", lambda: {"ts": None})().get("ts"),
+                "realized_pnl_today_usd": getattr(eng, "realized_pnl_today_usd", lambda: 0.0)(),
+                "trade_count_today": getattr(eng, "trade_count_today", lambda: 0)(),
             }
         except Exception as e:
             status["engine"] = f"error: {e}"

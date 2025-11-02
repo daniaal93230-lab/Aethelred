@@ -28,6 +28,8 @@ def _position_view(pos) -> Dict[str, Any]:
         "side": side,
         "mark": mark,
         "mtm_pnl_pct": pnl_pct,
+        "leverage": pos.get("leverage"),
+        "notional_usd": pos.get("notional_usd"),
     }
 
 

@@ -1,5 +1,5 @@
 import os, sqlite3, time, json
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Iterable
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -255,181 +255,269 @@ def init_db():
 
 
 class DBManager:
-    def __init__(self, db_path: str | None = None):
-        self.db_path = db_path or DB_PATH
-        # Open connection for this specific DB path and ensure tables exist here
-        self.conn = sqlite3.connect(self.db_path)
-        self.cursor = self.conn.cursor()
-        try:
-            self.cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS trades (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    trade_id TEXT UNIQUE,
-                    timestamp TEXT DEFAULT (datetime('now')),
-                    symbol TEXT NOT NULL,
-                    side TEXT CHECK(side IN ('buy','sell')) NOT NULL,
-                    price REAL NOT NULL,
-                    amount REAL NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'filled',
-                    is_mock INTEGER NOT NULL DEFAULT 0
-                )
-                """
-            )
-            self.cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS equity_snapshots(
-                    ts INTEGER PRIMARY KEY,
-                    equity REAL NOT NULL
-                )
-                """
-            )
-            self.conn.commit()
-        except Exception as e:
-            logger.error(f"Database initialization failed for {self.db_path}: {e}")
+    def __init__(self, *args, **kwargs):
+        """Create a DBManager.
 
-    def insert_trade(self, trade_id, symbol, side, price, amount, status="filled", is_mock=0):
+        Accepts optional db_path kwarg for tests to create an on-disk sqlite file.
         """
-        Insert a trade into the database.
-        """
+        db_path = kwargs.get("db_path") or os.getenv("DB_PATH") or ":memory:"
+        # ensure directory exists for on-disk DBs
         try:
-            side_clean = side.lower()
-            from datetime import datetime, timezone
-
-            timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-
-            self.cursor.execute(
-                """
-                INSERT OR IGNORE INTO trades
-                (trade_id, symbol, side, price, amount, timestamp, status, is_mock)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-                (trade_id, symbol, side_clean, price, amount, timestamp, status, is_mock),
-            )
-
-            self.conn.commit()
-            logger.info(f"Trade logged: {trade_id} | {side_clean.upper()} {amount} {symbol} at {price}")
-        except sqlite3.IntegrityError as e:
-            logger.warning(f"Failed to insert trade {trade_id} (duplicate or invalid data): {e}")
-        except Exception as e:
-            logger.error(f"Unexpected error during trade insertion: {e}")
-
-    def fetch_all_trades(self):
-        """
-        Fetch all trades ordered by latest.
-        """
-        try:
-            self.cursor.execute("SELECT * FROM trades ORDER BY timestamp DESC")
-            trades = self.cursor.fetchall()
-            logger.info(f"Fetched {len(trades)} trades from database.")
-            return trades
-        except Exception as e:
-            logger.error(f"Error fetching trades: {e}")
-            return []
-
-    def _one(self, q: str, params: tuple = ()):
-        try:
-            cur = self.conn.cursor()
-            cur.execute(q, params)
-            row = cur.fetchone()
-            if row is None:
-                return None
-            # expose dict-like with column names
-            names = [d[0] for d in cur.description]
-            return {names[i]: row[i] for i in range(len(names))}
+            d = os.path.dirname(db_path)
+            if d:
+                os.makedirs(d, exist_ok=True)
         except Exception:
-            return None
-
-    def fetch_last_closed_trade(self, symbol: str):
-        """Return last closed trade for symbol with computed pnl_usd, or None.
-        Expects a richer trades schema; if columns are missing, return None safely.
-        """
-        q = """
-            SELECT side, qty, price_entry, price_exit,
-                   (price_exit - price_entry) * CASE WHEN side='LONG' THEN qty ELSE -qty END AS pnl_usd
-            FROM trades
-            WHERE symbol = ? AND status = 'CLOSED'
-            ORDER BY close_time DESC
-            LIMIT 1
+            pass
+        self._conn = sqlite3.connect(db_path, check_same_thread=False)
+        self._conn.row_factory = sqlite3.Row
+        # Ensure legacy `trades` table with expected column ordering exists first
+        # so tests and legacy code that rely on column indices work.
+        self._conn.execute(
             """
-        return self._one(q, (symbol,))
-
-    def close(self):
-        """
-        Close the database connection.
-        """
+            CREATE TABLE IF NOT EXISTS trades (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trade_id TEXT UNIQUE,
+                timestamp TEXT DEFAULT (datetime('now')),
+                symbol TEXT NOT NULL,
+                side TEXT CHECK(side IN ('buy','sell')) NOT NULL,
+                price REAL,
+                amount REAL,
+                status TEXT NOT NULL DEFAULT 'filled',
+                is_mock INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+        self._conn.commit()
+        # create our minimal schema (other tables) after legacy trades; it will not replace existing `trades`
+        self._ensure_minimal_schema()
+        # Ensure trade_id column exists on legacy DBs (some migrations create a different 'trades' layout)
         try:
-            self.conn.close()
-            logger.info("Database connection closed.")
-        except Exception as e:
-            logger.error(f"Error closing database: {e}")
-
-    # --- Equity snapshot helpers ---
-    def save_equity_snapshot(self, equity: float, ts: int | None = None):
-        try:
-            if ts is None:
-                ts = int(time.time())
-            conn = _get_conn()
-            cur = conn.cursor()
-            cur.execute("INSERT OR REPLACE INTO equity_snapshots(ts,equity) VALUES(?,?)", (int(ts), float(equity)))
-            conn.commit()
-            conn.close()
-        except Exception as e:
-            logger.warning(f"save_equity_snapshot failed: {e}")
-
-    def get_latest_equity(self) -> float | None:
-        try:
-            conn = _get_conn()
-            cur = conn.cursor()
-            cur.execute("SELECT equity FROM equity_snapshots ORDER BY ts DESC LIMIT 1")
-            row = cur.fetchone()
-            conn.close()
-            return float(row[0]) if row else None
+            cur = self._conn.execute("PRAGMA table_info(trades)")
+            cols = [r[1] for r in cur.fetchall()]
+            # Ensure legacy columns exist (some DBs have a different 'trades' layout)
+            missing = [c for c in ("trade_id", "timestamp", "price", "amount", "status", "is_mock") if c not in cols]
+            for col in missing:
+                try:
+                    if col == "trade_id":
+                        self._conn.execute("ALTER TABLE trades ADD COLUMN trade_id TEXT")
+                    elif col == "timestamp":
+                        self._conn.execute("ALTER TABLE trades ADD COLUMN timestamp TEXT DEFAULT (datetime('now'))")
+                    elif col == "price":
+                        self._conn.execute("ALTER TABLE trades ADD COLUMN price REAL")
+                    elif col == "amount":
+                        self._conn.execute("ALTER TABLE trades ADD COLUMN amount REAL")
+                    elif col == "status":
+                        self._conn.execute("ALTER TABLE trades ADD COLUMN status TEXT DEFAULT 'filled'")
+                    elif col == "is_mock":
+                        self._conn.execute("ALTER TABLE trades ADD COLUMN is_mock INTEGER DEFAULT 0")
+                except Exception:
+                    # ignore failures (e.g., column exists in another form)
+                    pass
+            try:
+                self._conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_trades_trade_id ON trades(trade_id)")
+            except Exception:
+                pass
+            self._conn.commit()
         except Exception:
-            return None
+            pass
+        # Postgres adapter (optional) selected by DB_URL environment variable
+        PG_PREFIXES = ("postgres://", "postgresql://")
+        self._pg = None
+        try:
+            db_url = os.getenv("DB_URL", "") or ""
+            if any(db_url.startswith(p) for p in PG_PREFIXES):
+                from db.pg_adapter import PgAdapter
+
+                self._pg = PgAdapter(db_url)
+        except Exception:
+            # Fail gracefully — continue using sqlite fallback
+            self._pg = None
+        # Postgres adapter (optional) selected by DB_URL environment variable
+        self._pg = None
+        try:
+            db_url = os.getenv("DB_URL", "") or ""
+            if any(db_url.startswith(p) for p in PG_PREFIXES):
+                from db.pg_adapter import PgAdapter
+
+                self._pg = PgAdapter(db_url)
+        except Exception:
+            # Fail gracefully — continue using sqlite fallback
+            self._pg = None
 
     # --- Utility clock ---
     def now_ts(self) -> int:
+        if getattr(self, "_pg", None):
+            return self._pg.now_ts()
         import time
 
         return int(time.time())
 
-    def iter_trades(self):
-        """
-        Iterate over trades. Replace with real DB cursor for large tables.
-        """
-        # conservative stub — yield nothing
-        yield from []
+    # --- Trades iteration (CSV export source) ---
+    def iter_trades(self) -> Iterable[Dict[str, Any]]:
+        if getattr(self, "_pg", None):
+            yield from self._pg.iter_trades()
+            return
+        try:
+            cur = self._conn.execute(
+                "select ts_open, ts_close, symbol, side, qty, entry, exit, pnl_usd as pnl, return_pct as pnl_pct, fee_usd, slippage_bps, note from trades order by ts_close nulls last, ts_open"
+            )
+            for r in cur.fetchall():
+                yield dict(r)
+        except Exception:
+            yield from []
 
-    # --- Training jobs queue ---
+    # --- Legacy helpers used by tests / other modules ---
+    def insert_trade(self, trade_id, symbol, side, price, amount, status="filled", is_mock=0):
+        """Insert a simple trade into the legacy `trades` table.
+
+        Duplicate trade_id values are ignored.
+        """
+        try:
+            side_clean = str(side).lower()
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+            cur = self._conn.execute(
+                """
+                INSERT OR IGNORE INTO trades
+                (trade_id, symbol, side, price, amount, timestamp, status, is_mock)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (trade_id, symbol, side_clean, price, amount, timestamp, status, int(is_mock)),
+            )
+            self._conn.commit()
+            return cur.lastrowid
+        except sqlite3.IntegrityError:
+            return None
+
+    def fetch_all_trades(self):
+        cur = self._conn.execute("SELECT * FROM trades ORDER BY timestamp DESC")
+        return cur.fetchall()
+
+    def close(self):
+        try:
+            self._conn.close()
+        except Exception:
+            pass
+
+    # --- Training jobs queue (very small stub, replace with real queue in prod) ---
     def enqueue_job(self, kind: str, job: str, notes: str | None = None) -> dict:
-        """
-        Insert or upsert a training job ticket. Replace with real DB logic.
-        """
-        ticket = {"id": f"{kind.upper()}-{self.now_ts()}", "job": job, "notes": notes}
-        # TODO: persist
-        return ticket
+        if getattr(self, "_pg", None):
+            return self._pg.enqueue_job(kind=kind, job=job, notes=notes)
+
+        self._conn.execute(
+            "insert into jobs(kind, job, notes, status, ts_created) values (?, ?, ?, 'queued', ?)",
+            (kind, job, notes, self.now_ts()),
+        )
+        self._conn.commit()
+        cur = self._conn.execute("select id, kind, job from jobs order by id desc limit 1")
+        row = cur.fetchone()
+        return {"id": f"{row['kind']}-{row['id']}", "job": row["job"], "notes": notes}
+
+    def dequeue_job(self, kind: str = "train") -> dict | None:
+        if getattr(self, "_pg", None):
+            return self._pg.dequeue_job(kind=kind)
+
+        cur = self._conn.execute(
+            "select id, kind, job, notes from jobs where status='queued' and kind=? order by id asc limit 1", (kind,)
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+        self._conn.execute("update jobs set status='running', ts_started=? where id=?", (self.now_ts(), row["id"]))
+        self._conn.commit()
+        return dict(row)
+
+    def complete_job(self, job_id: int, ok: bool, notes: str | None = None):
+        if getattr(self, "_pg", None):
+            self._pg.complete_job(job_id=job_id, ok=ok, notes=notes)
+            return
+
+        status = "done" if ok else "failed"
+        self._conn.execute(
+            "update jobs set status=?, ts_finished=?, notes=coalesce(?, notes) where id=?",
+            (status, self.now_ts(), notes, job_id),
+        )
+        self._conn.commit()
 
     # --- Performance summaries for today ---
     def realized_pnl_today_usd(self) -> float:
-        """
-        Compute realized PnL today in USD. Replace stub with SQL view if available.
-        """
+        if getattr(self, "_pg", None):
+            return self._pg.realized_pnl_today_usd()
+
+        # prefer view if available, fall back to direct aggregate
         try:
-            # If you have a trades table with ts_close and pnl columns, aggregate there
-            # Example SQL kept in migrations. Here return 0.0 for stub.
-            return 0.0
+            cur = self._conn.execute("select realized_pnl_today_usd from v_realized_pnl_today_usd")
+            row = cur.fetchone()
+            if row:
+                return float(row[0])
+        except Exception:
+            pass
+        try:
+            cur = self._conn.execute(
+                "select coalesce(sum(pnl_usd), 0.0) from trades where ts_close >= ?",
+                (self._start_of_day_ts(),),
+            )
+            return float(cur.fetchone()[0] or 0.0)
         except Exception:
             return 0.0
 
     def trade_count_today(self) -> int:
-        """
-        Count closed trades today. Replace stub with SQL view if available.
-        """
+        if getattr(self, "_pg", None):
+            return self._pg.trade_count_today()
+
         try:
-            return 0
+            cur = self._conn.execute("select trade_count_today from v_trade_count_today")
+            row = cur.fetchone()
+            if row:
+                return int(row[0])
+        except Exception:
+            pass
+        try:
+            cur = self._conn.execute(
+                "select count(1) from trades where ts_close >= ?",
+                (self._start_of_day_ts(),),
+            )
+            return int(cur.fetchone()[0] or 0)
         except Exception:
             return 0
+
+    # --- Helpers and bootstrap ---
+    def _ensure_minimal_schema(self):
+        self._conn.executescript(
+            """
+            create table if not exists trades(
+              id integer primary key autoincrement,
+              ts_open integer,
+              ts_close integer,
+              symbol text,
+              side text,
+              qty real,
+              entry real,
+              exit real,
+              pnl_usd real,
+              return_pct real,
+              fee_usd real,
+              slippage_bps real,
+              note text
+            );
+            create table if not exists jobs(
+              id integer primary key autoincrement,
+              kind text not null,
+              job text not null,
+              notes text,
+              status text not null default 'queued',
+              ts_created integer,
+              ts_started integer,
+              ts_finished integer
+            );
+            """
+        )
+        self._conn.commit()
+
+    def _start_of_day_ts(self) -> int:
+        import datetime, time
+
+        dt = datetime.datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        return int(time.mktime(dt.timetuple()))
 
 
 def save_equity_snapshot(equity: float, ts: int | None = None):
