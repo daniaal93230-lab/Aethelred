@@ -380,7 +380,7 @@
     },
     {
       "path": "apps/visor/streamlit_app.py",
-      "size": 5978,
+      "size": 8508,
       "first_line": "\"\"\"",
       "docstring": "Visor: minimal truth UI for Aethelred \n Env:\n  VISOR_API_BASE   Base URL of the running API, default http://127.0.0.1:8080\nEndpoints used:\n  GET {VISOR_API_BASE}/healthz\n  GET {VISOR_API_BASE}/runtime/account_runtime.json \n Expected runtime/account_runtime.json shape (robust to missing keys):\n{\n  \"heartbeat_ts\": \"2025-10-26T18:22:15.123Z\",\n  \"equity\": [\n    {\"ts\": \"2025-10-26T18:20:00Z\", \"equity\": 100000.0},\n    {\"ts\": \"2025-10-26T18:21:00Z\", \"equity\": 100250.4},\n    ...\n  ],\n  \"positions\": [\n    {\n      \"s..."
     },
@@ -1094,7 +1094,7 @@
     },
     {
       "path": "repo_index_compact.json",
-      "size": 49100,
+      "size": 49505,
       "first_line": "{",
       "docstring": null
     },
