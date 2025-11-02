@@ -949,6 +949,12 @@
       "docstring": null
     },
     {
+      "path": "docs/ops_paper_run.md",
+      "size": 630,
+      "first_line": "# Supervised paper session runbook",
+      "docstring": null
+    },
+    {
       "path": "docs/strategos.md",
       "size": 2577,
       "first_line": "# Strategos: Strategy Interface and Raw Signal Logging",
@@ -1088,7 +1094,7 @@
     },
     {
       "path": "repo_index_compact.json",
-      "size": 48803,
+      "size": 49100,
       "first_line": "{",
       "docstring": null
     },
@@ -1154,8 +1160,8 @@
     },
     {
       "path": "runtime/news_items.json",
-      "size": 25091,
-      "first_line": "[{\"title\": \"US Treasury chief Bessent says 'substantial' trade framework with China reached\", \"link\": \"https://cointelegraph.com/news/bessent-substantial-trade-framework-china?utm_source=rss_feed&utm_",
+      "size": 25420,
+      "first_line": "[{\"title\": \"Bitcoin 'money vessel' amasses $8B but recovery lacks ETF inflows\", \"link\": \"https://cointelegraph.com/news/bitcoin-money-vessel-8b-recovery-lacks-etf?utm_source=rss_feed&utm_medium=rss&ut",
       "docstring": null
     },
     {
@@ -1321,6 +1327,18 @@
       "docstring": null
     },
     {
+      "path": "scripts/run_api_paper.ps1",
+      "size": 1473,
+      "first_line": "Param(",
+      "docstring": null
+    },
+    {
+      "path": "scripts/run_api_paper.sh",
+      "size": 661,
+      "first_line": "#!/usr/bin/env bash",
+      "docstring": null
+    },
+    {
       "path": "scripts/run_migrations.py",
       "size": 1149,
       "first_line": "#!/usr/bin/env python",
@@ -1334,13 +1352,13 @@
     },
     {
       "path": "scripts/run_paper_loop.ps1",
-      "size": 1940,
-      "first_line": "# run_paper_loop.ps1",
+      "size": 456,
+      "first_line": "<#",
       "docstring": null
     },
     {
       "path": "scripts/run_paper_quick.ps1",
-      "size": 1573,
+      "size": 1534,
       "first_line": "Param(",
       "docstring": null
     },
