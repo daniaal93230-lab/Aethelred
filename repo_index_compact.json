@@ -56,7 +56,7 @@
     },
     {
       "path": ".gitignore",
-      "size": 770,
+      "size": 821,
       "first_line": "\ufeff# env & caches",
       "docstring": null
     },
@@ -134,7 +134,7 @@
     },
     {
       "path": ".ruff_cache/0.14.3/16405797324829307559",
-      "size": 693,
+      "size": 731,
       "first_line": "",
       "docstring": null
     },
@@ -919,6 +919,12 @@
       "docstring": null
     },
     {
+      "path": "docs/examples/decision_row.json",
+      "size": 365,
+      "first_line": "",
+      "docstring": null
+    },
+    {
       "path": "docs/insight_journal.md",
       "size": 2937,
       "first_line": "# Aethelred Insight Journal and Metrics",
@@ -926,7 +932,7 @@
     },
     {
       "path": "docs/strategos.md",
-      "size": 2113,
+      "size": 2577,
       "first_line": "# Strategos: Strategy Interface and Raw Signal Logging",
       "docstring": null
     },
@@ -1263,6 +1269,12 @@
     {
       "path": "scripts/prune_legacy.py",
       "size": 2355,
+      "first_line": "import argparse",
+      "docstring": null
+    },
+    {
+      "path": "scripts/pull_decisions.py",
+      "size": 1039,
       "first_line": "import argparse",
       "docstring": null
     },
