@@ -134,7 +134,7 @@
     },
     {
       "path": ".ruff_cache/0.14.3/16405797324829307559",
-      "size": 731,
+      "size": 769,
       "first_line": "",
       "docstring": null
     },
@@ -194,7 +194,7 @@
     },
     {
       "path": ".ruff_cache/0.14.3/6445456710033260170",
-      "size": 206,
+      "size": 240,
       "first_line": "",
       "docstring": null
     },
@@ -224,7 +224,7 @@
     },
     {
       "path": "README.md",
-      "size": 1768,
+      "size": 1910,
       "first_line": "# Aethelred",
       "docstring": null
     },
@@ -272,9 +272,9 @@
     },
     {
       "path": "api/bootstrap_real_engine.py",
-      "size": 4298,
+      "size": 4609,
       "first_line": "\"\"\"",
-      "docstring": "Bootstrap the real engine and attach it to FastAPI for uvicorn --factory.\nUsage:\n  uvicorn api.bootstrap_real_engine:create_app --host 127.0.0.1 --port 8080\nEnv:\n  LIVE=1                to ensure QA engine cannot attach\n  SAFE_FLATTEN_ON_START optional safety on startup"
+      "docstring": "Bootstrap the real engine and attach it to FastAPI for uvicorn --factory.\nUsage:\n    uvicorn api.bootstrap_real_engine:create_app --host 127.0.0.1 --port 8080\nEnv:\n    LIVE=1                to prevent QA engine auto attach\n    SAFE_FLATTEN_ON_START optional safety on startup\n    SNAPSHOT_IDLE_SEC     optional idle snapshot loop interval (default 15)"
     },
     {
       "path": "api/contracts/decisions_header.py",
@@ -290,7 +290,7 @@
     },
     {
       "path": "api/main.py",
-      "size": 70569,
+      "size": 72672,
       "first_line": "# api/main.py",
       "docstring": null
     },
@@ -332,7 +332,7 @@
     },
     {
       "path": "api/routes/ops.py",
-      "size": 2660,
+      "size": 2842,
       "first_line": "from typing import Optional",
       "docstring": null
     },
@@ -860,7 +860,7 @@
     },
     {
       "path": "db/db_manager.py",
-      "size": 26703,
+      "size": 30766,
       "first_line": "import os, sqlite3, time, json",
       "docstring": null
     },
@@ -898,6 +898,12 @@
       "path": "db/models.py",
       "size": 0,
       "first_line": "",
+      "docstring": null
+    },
+    {
+      "path": "db/pg_adapter.py",
+      "size": 4522,
+      "first_line": "from __future__ import annotations",
       "docstring": null
     },
     {
@@ -1076,7 +1082,7 @@
     },
     {
       "path": "repo_index_compact.json",
-      "size": 47739,
+      "size": 48262,
       "first_line": "{",
       "docstring": null
     },
@@ -1088,7 +1094,7 @@
     },
     {
       "path": "requirements.txt",
-      "size": 175,
+      "size": 196,
       "first_line": "PyYAML>=6.0",
       "docstring": null
     },
@@ -1307,6 +1313,12 @@
       "size": 985,
       "first_line": "param([int]$Hours=4)",
       "docstring": null
+    },
+    {
+      "path": "scripts/run_migrations.py",
+      "size": 1149,
+      "first_line": "#!/usr/bin/env python",
+      "docstring": "Simple migration runner for Postgres that executes all *.sql files in db/migrations in lexical order.\nUsage:\n  DB_URL=postgres://... python scripts/run_migrations.py"
     },
     {
       "path": "scripts/run_paper.ps1",
@@ -1772,7 +1784,7 @@
     },
     {
       "path": "utils/snapshot.py",
-      "size": 2284,
+      "size": 2374,
       "first_line": "import json",
       "docstring": null
     },
