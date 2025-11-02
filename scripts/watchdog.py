@@ -26,7 +26,8 @@ def main():
     args = ap.parse_args()
 
     fail = 0
-    health = f"{args.base}/healthz"
+    # allow apps that mount ops routes without prefix
+    health = f"{args.base.rstrip('/')}/healthz"
     flatten = f"{args.base}/flatten"
     print(f"[watchdog] polling {health} every {args.interval}s; failures threshold {args.failures}")
     while True:

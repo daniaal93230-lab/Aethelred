@@ -59,6 +59,7 @@ class ExecutionEngine:
             self._wrs = _wrs
         except Exception:
             self._wrs = None
+        self._fills_since_last_snapshot = False
 
     def _flatten_symbol(self, symbol: str) -> None:
         """
@@ -114,7 +115,21 @@ class ExecutionEngine:
         # write compact runtime snapshot for dashboard if available
         try:
             if getattr(self, "_wrs", None):
+                # mark that fills/mtm changed since last snapshot
+                self._fills_since_last_snapshot = True
                 self._wrs(self)
+                self._fills_since_last_snapshot = False
+        except Exception:
+            pass
+
+    # This method can be called by broker fill callbacks
+    def on_fill_recorded(self):
+        self._fills_since_last_snapshot = True
+        try:
+            # write a fresh snapshot immediately after fill
+            if getattr(self, "_wrs", None):
+                self._wrs(self)
+                self._fills_since_last_snapshot = False
         except Exception:
             pass
     def run_live(self, symbol="BTCUSDT", trade=False):

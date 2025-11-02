@@ -42,11 +42,19 @@ def write_runtime_snapshot(obj, extra: Dict[str, Any] | None = None) -> None:
     else:
         acct = {}
     positions: List[Dict[str, Any]] = [_position_view(p) for p in acct.get("positions", [])]
+    # realized pnl today and trade count if engine exposes helpers
+    realized = getattr(obj, "realized_pnl_today_usd", None)
+    trades_today = getattr(obj, "trade_count_today", None)
+    realized_today = float(realized()) if callable(realized) else acct.get("realized_pnl_today_usd")
+    trade_count = int(trades_today()) if callable(trades_today) else acct.get("trade_count_today")
+
     snapshot = {
         "ts": acct.get("ts"),
         "equity_now": acct.get("equity_now"),
         "total_notional_usd": acct.get("total_notional_usd"),
         "positions": positions,
+        "realized_pnl_today_usd": realized_today,
+        "trade_count_today": trade_count,
     }
     if extra:
         snapshot.update(extra)

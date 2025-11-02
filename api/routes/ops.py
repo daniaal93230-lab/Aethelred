@@ -15,15 +15,20 @@ def _engine(request: Request):
 @router.get("/healthz")
 async def healthz(request: Request):
     """
-    Simple liveness and engine heartbeat.
-    Returns 200 if API is up and engine heartbeat is available.
+    Liveness and engine heartbeat.
+    Includes positions_count and last_tick_ts when available.
     """
     eng = getattr(request.app.state, "engine", None)
     status = {"api": "ok", "engine": "missing"}
     if eng is not None and hasattr(eng, "heartbeat"):
         try:
             hb = eng.heartbeat()
-            status["engine"] = hb
+            # normalize common fields
+            status["engine"] = {
+                "ok": hb.get("ok", True),
+                "positions_count": hb.get("positions_count", hb.get("positions", 0)),
+                "last_tick_ts": hb.get("last_tick_ts", hb.get("ts")),
+            }
         except Exception as e:
             status["engine"] = f"error: {e}"
     return status
