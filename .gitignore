@@ -69,3 +69,4 @@ models/*
 .pytest_cache
 .venv
 __pycache__/
+.streamlit/

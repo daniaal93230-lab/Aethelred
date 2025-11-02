@@ -31,3 +31,17 @@ files = ["api"]  # only type-check API for now
 [tool.pytest.ini_options]
 testpaths = ["tests", "tests_core"]
 addopts = "-q"
+
+
+[project.optional-dependencies]
+dev = [
+  "ruff",
+  "pytest",
+  "pyyaml",
+  "httpx",
+]
+visor = [
+  "streamlit>=1.38",
+  "requests>=2.31",
+  "pandas>=2.0",
+]
