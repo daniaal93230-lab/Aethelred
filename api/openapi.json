@@ -349,17 +349,16 @@
     },
     "/train": {
       "post": {
-        "tags": [
-          "train"
-        ],
-        "summary": "Trigger Train",
-        "description": "Thin trigger for ML training. No training logic here.\nDelegates to engine.orchestrator which enqueues work or signals a worker.\nIdempotent: repeated calls with the same job key should be safe.",
-        "operationId": "trigger_train_train_post",
+        "summary": "Train Intent Veto Endpoint",
+        "description": "Kick off training and write artifacts under models/intent_veto.\nBody:\n    {\n        \"signals_csv\": \"data/decisions.csv\",\n        \"candles_csv\": \"data/candles/BTCUSDT.csv\",\n        \"horizon\": 12,\n        \"symbol\": \"BTCUSDT\"\n    }",
+        "operationId": "train_intent_veto_endpoint_train_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TrainRequest"
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Payload"
               }
             }
           },

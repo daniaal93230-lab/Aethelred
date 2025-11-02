@@ -56,7 +56,7 @@
     },
     {
       "path": ".gitignore",
-      "size": 647,
+      "size": 758,
       "first_line": "\ufeff# env & caches",
       "docstring": null
     },
@@ -98,7 +98,7 @@
     },
     {
       "path": ".ruff_cache/0.14.3/1127600864467113360",
-      "size": 93,
+      "size": 130,
       "first_line": "",
       "docstring": null
     },
@@ -151,6 +151,12 @@
       "docstring": null
     },
     {
+      "path": ".ruff_cache/0.14.3/17923447209750609491",
+      "size": 217,
+      "first_line": "",
+      "docstring": null
+    },
+    {
       "path": ".ruff_cache/0.14.3/2200317804781333797",
       "size": 487,
       "first_line": "",
@@ -165,6 +171,12 @@
     {
       "path": ".ruff_cache/0.14.3/2795729012206064471",
       "size": 109,
+      "first_line": "",
+      "docstring": null
+    },
+    {
+      "path": ".ruff_cache/0.14.3/316209595474699999",
+      "size": 120,
       "first_line": "",
       "docstring": null
     },
@@ -206,7 +218,7 @@
     },
     {
       "path": "README.md",
-      "size": 1129,
+      "size": 1769,
       "first_line": "# Aethelred",
       "docstring": null
     },
@@ -259,14 +271,20 @@
       "docstring": null
     },
     {
+      "path": "api/contracts/trades_header.py",
+      "size": 1409,
+      "first_line": "\"\"\"",
+      "docstring": "Canonical header for trades.csv that the API must serve.\nKeep this the single source of truth for downstream consumers."
+    },
+    {
       "path": "api/main.py",
-      "size": 69532,
+      "size": 70569,
       "first_line": "# api/main.py",
       "docstring": null
     },
     {
       "path": "api/openapi.json",
-      "size": 35874,
+      "size": 35963,
       "first_line": "{",
       "docstring": null
     },
@@ -320,7 +338,7 @@
     },
     {
       "path": "api/routes/train.py",
-      "size": 939,
+      "size": 2037,
       "first_line": "from fastapi import APIRouter, HTTPException, Request",
       "docstring": null
     },
@@ -655,6 +673,12 @@
       "docstring": null
     },
     {
+      "path": "core/ml_gate.py",
+      "size": 1331,
+      "first_line": "from __future__ import annotations",
+      "docstring": null
+    },
+    {
       "path": "core/news.py",
       "size": 2593,
       "first_line": "from __future__ import annotations",
@@ -817,6 +841,12 @@
       "docstring": null
     },
     {
+      "path": "db/journal_schema.sql",
+      "size": 3074,
+      "first_line": "-- Aethelred Journal Schema (SQLite)",
+      "docstring": null
+    },
+    {
       "path": "db/migrations/004_risk_state.sql",
       "size": 333,
       "first_line": "-- risk state store",
@@ -853,9 +883,21 @@
       "docstring": null
     },
     {
+      "path": "db/views_journal.sql",
+      "size": 2019,
+      "first_line": "-- Views for daily PnL, per-symbol stats, and helper series",
+      "docstring": null
+    },
+    {
       "path": "decisions.csv",
       "size": 14396,
       "first_line": "ts,symbol,strategy,regime,signal,intent,size_usd,price,ml_p_up,ml_vote,veto,reasons,planned_stop,planned_tp,run_id",
+      "docstring": null
+    },
+    {
+      "path": "docs/insight_journal.md",
+      "size": 2937,
+      "first_line": "# Aethelred Insight Journal and Metrics",
       "docstring": null
     },
     {
@@ -910,6 +952,48 @@
       "path": "fetch_market_data.py",
       "size": 2690,
       "first_line": "# fetch_market_data.py",
+      "docstring": null
+    },
+    {
+      "path": "fixtures/journal_sample.sql",
+      "size": 1065,
+      "first_line": ".read db/journal_schema.sql",
+      "docstring": null
+    },
+    {
+      "path": "ml/__init__.py",
+      "size": 270,
+      "first_line": "from .feature_pipeline import build_features",
+      "docstring": null
+    },
+    {
+      "path": "ml/feature_pipeline.py",
+      "size": 4108,
+      "first_line": "from __future__ import annotations",
+      "docstring": null
+    },
+    {
+      "path": "ml/labeler.py",
+      "size": 3046,
+      "first_line": "from __future__ import annotations",
+      "docstring": null
+    },
+    {
+      "path": "ml/metrics.py",
+      "size": 1698,
+      "first_line": "from __future__ import annotations",
+      "docstring": null
+    },
+    {
+      "path": "ml/train_intent_veto.py",
+      "size": 4521,
+      "first_line": "from __future__ import annotations",
+      "docstring": null
+    },
+    {
+      "path": "models/.gitkeep",
+      "size": 42,
+      "first_line": "#",
       "docstring": null
     },
     {
@@ -1207,6 +1291,12 @@
       "docstring": null
     },
     {
+      "path": "scripts/train_intent_veto.sh",
+      "size": 202,
+      "first_line": "#!/usr/bin/env bash",
+      "docstring": null
+    },
+    {
       "path": "scripts/train_intent_veto_v1.py",
       "size": 7402,
       "first_line": "#!/usr/bin/env python3",
@@ -1294,6 +1384,12 @@
       "path": "tests/__init__.py",
       "size": 0,
       "first_line": "",
+      "docstring": null
+    },
+    {
+      "path": "tests/fixtures/journal_sample.sql",
+      "size": 1065,
+      "first_line": ".read db/journal_schema.sql",
       "docstring": null
     },
     {
@@ -1480,6 +1576,18 @@
       "path": "tests_core/test_selector.py",
       "size": 475,
       "first_line": "from strategy.selector import pick_by_regime",
+      "docstring": null
+    },
+    {
+      "path": "tests_ml/__init__.py",
+      "size": 66,
+      "first_line": "# Marks tests_ml as a package so pytest can discover it reliably.",
+      "docstring": null
+    },
+    {
+      "path": "tests_ml/test_ml_training.py",
+      "size": 5198,
+      "first_line": "import json",
       "docstring": null
     },
     {
