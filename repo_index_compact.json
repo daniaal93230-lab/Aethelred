@@ -97,121 +97,121 @@
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/1127600864467113360",
+      "path": ".ruff_cache/0.14.4/1127600864467113360",
       "size": 130,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/11638596181637876275",
+      "path": ".ruff_cache/0.14.4/11638596181637876275",
       "size": 785,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/12947006564008525681",
+      "path": ".ruff_cache/0.14.4/12947006564008525681",
       "size": 84,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/13113192207449778328",
+      "path": ".ruff_cache/0.14.4/13113192207449778328",
       "size": 175,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/15387219469415748884",
+      "path": ".ruff_cache/0.14.4/15387219469415748884",
       "size": 102,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/1572007642514256731",
+      "path": ".ruff_cache/0.14.4/1572007642514256731",
       "size": 87,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/16405797324829307559",
+      "path": ".ruff_cache/0.14.4/16405797324829307559",
       "size": 769,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/16686246387925838939",
+      "path": ".ruff_cache/0.14.4/16686246387925838939",
       "size": 285,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/17052952824662009193",
+      "path": ".ruff_cache/0.14.4/17052952824662009193",
       "size": 80,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/17923447209750609491",
+      "path": ".ruff_cache/0.14.4/17923447209750609491",
       "size": 256,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/2200317804781333797",
-      "size": 532,
+      "path": ".ruff_cache/0.14.4/2200317804781333797",
+      "size": 610,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/2387240623249400781",
+      "path": ".ruff_cache/0.14.4/2387240623249400781",
       "size": 135,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/2795729012206064471",
+      "path": ".ruff_cache/0.14.4/2795729012206064471",
       "size": 109,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/316209595474699999",
+      "path": ".ruff_cache/0.14.4/316209595474699999",
       "size": 165,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/3754106019521563112",
+      "path": ".ruff_cache/0.14.4/3754106019521563112",
       "size": 175,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/4515496761311577799",
+      "path": ".ruff_cache/0.14.4/4515496761311577799",
       "size": 203,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/6445456710033260170",
+      "path": ".ruff_cache/0.14.4/6445456710033260170",
       "size": 240,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/7797079289912585377",
+      "path": ".ruff_cache/0.14.4/7797079289912585377",
       "size": 108,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/7822531232637135943",
+      "path": ".ruff_cache/0.14.4/7822531232637135943",
       "size": 112,
       "first_line": "",
       "docstring": null
     },
     {
-      "path": ".ruff_cache/0.14.3/8934466943597251918",
+      "path": ".ruff_cache/0.14.4/8934466943597251918",
       "size": 87,
       "first_line": "",
       "docstring": null
@@ -296,7 +296,7 @@
     },
     {
       "path": "api/openapi.json",
-      "size": 36395,
+      "size": 38305,
       "first_line": "{",
       "docstring": null
     },
@@ -308,13 +308,19 @@
     },
     {
       "path": "api/routes/__init__.py",
-      "size": 574,
+      "size": 806,
       "first_line": "from fastapi import APIRouter",
       "docstring": null
     },
     {
       "path": "api/routes/demo.py",
       "size": 2658,
+      "first_line": "from __future__ import annotations",
+      "docstring": null
+    },
+    {
+      "path": "api/routes/demo_loop.py",
+      "size": 828,
       "first_line": "from __future__ import annotations",
       "docstring": null
     },
@@ -346,6 +352,12 @@
       "path": "api/routes/risk.py",
       "size": 768,
       "first_line": "from typing import Any, Dict",
+      "docstring": null
+    },
+    {
+      "path": "api/routes/runtime.py",
+      "size": 3258,
+      "first_line": "from __future__ import annotations",
       "docstring": null
     },
     {
@@ -1759,9 +1771,27 @@
       "docstring": null
     },
     {
+      "path": "tools/git_pull_rebase_push.ps1",
+      "size": 612,
+      "first_line": "Set-Location 'C:\\Code\\Aethelred'",
+      "docstring": null
+    },
+    {
+      "path": "tools/git_push_changes.ps1",
+      "size": 533,
+      "first_line": "Set-Location 'C:\\Code\\Aethelred'",
+      "docstring": null
+    },
+    {
       "path": "tools/seed_paper_state.py",
       "size": 953,
       "first_line": "import os",
+      "docstring": null
+    },
+    {
+      "path": "tools/stop_supervised_run.ps1",
+      "size": 1990,
+      "first_line": "Set-Location 'C:\\Code\\Aethelred'",
       "docstring": null
     },
     {

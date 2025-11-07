@@ -363,6 +363,77 @@
         }
       }
     },
+    "/runtime/account_runtime.json": {
+      "get": {
+        "tags": [
+          "runtime"
+        ],
+        "summary": "Runtime Account Runtime Json",
+        "operationId": "runtime_account_runtime_json_runtime_account_runtime_json_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demo/paper_quick_loop": {
+      "post": {
+        "tags": [
+          "demo"
+        ],
+        "summary": "Demo Paper Quick Loop",
+        "description": "Continuously call /demo/paper_quick_run every ~sleep_ms for up to secs seconds.\n\nReturns:\n    {ok: True, runs: count}",
+        "operationId": "demo_paper_quick_loop_demo_paper_quick_loop_post",
+        "parameters": [
+          {
+            "name": "secs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 60,
+              "title": "Secs"
+            }
+          },
+          {
+            "name": "sleep_ms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 750,
+              "title": "Sleep Ms"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/train": {
       "post": {
         "summary": "Train Intent Veto Endpoint",
