@@ -1,23 +1,29 @@
+param(
+  [switch]$Quiet,
+  [int]$Port = 8080,
+  [string]$ApiHost = "127.0.0.1"
+)
+
 Set-Location 'C:\Code\Aethelred'
 
-# Stop processes owning port 8080 (uvicorn)
-$pids = @(Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique)
+# Stop processes owning the chosen port (uvicorn)
+$pids = @(Get-NetTCPConnection -LocalAddress $ApiHost -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique)
 if ($pids.Count -gt 0) {
-    foreach ($killPid in $pids) {
-        try { Stop-Process -Id $killPid -Force -ErrorAction Stop; Write-Host "Stopped port PID: $killPid" } catch { }
+    foreach ($p in $pids) {
+        try { Stop-Process -Id $p -Force -ErrorAction Stop; if (-not $Quiet) { Write-Host "Stopped port PID: $p" } } catch { if (-not $Quiet) { Write-Warning "Could not stop PID $p" } }
     }
 } else {
-    Write-Host 'No port 8080 owners'
+    if (-not $Quiet) { Write-Host "No port $Port owners" }
 }
 
 # Stop known matching processes by commandline
 $matches = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'uvicorn|watchdog.py|streamlit|bot.brain' } | Select-Object -ExpandProperty ProcessId -Unique
 if ($matches) {
-    foreach ($killPid in $matches) {
-        try { Stop-Process -Id $killPid -Force -ErrorAction Stop; Write-Host "Stopped matching PID: $killPid" } catch { }
+    foreach ($m in $matches) {
+        try { Stop-Process -Id $m -Force -ErrorAction Stop; if (-not $Quiet) { Write-Host "Stopped matching PID: $m" } } catch { if (-not $Quiet) { Write-Warning "Could not stop matching PID $m" } }
     }
 } else {
-    Write-Host 'No matching processes found'
+    if (-not $Quiet) { Write-Host 'No matching processes found' }
 }
 
 # NOTE: Do NOT stop all python processes here. That is too aggressive and may
@@ -31,7 +37,7 @@ if ($py) {
         Write-Host " PID: $($p.Id)  Started: $($p.StartTime)  Cmd: (use Get-CimInstance Win32_Process to inspect)"
     }
 } else {
-    Write-Host 'No python processes found'
+    if (-not $Quiet) { Write-Host 'No python processes found' }
 }
 
 Write-Host 'Remaining matching processes (uvicorn/watchdog/streamlit/bot.brain):'
@@ -39,8 +45,9 @@ Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'uvicorn|wa
 
 # Check healthz
 try {
-    $h = Invoke-RestMethod http://127.0.0.1:8080/healthz -ErrorAction Stop
+    $url = ("http://{0}:{1}/healthz" -f $ApiHost, $Port)
+    $h = Invoke-RestMethod $url -ErrorAction Stop
     Write-Host 'healthz: ' (ConvertTo-Json $h -Depth 5)
 } catch {
-    Write-Host 'healthz unreachable: ' $_.Exception.Message
+    Write-Host "healthz unreachable: $($_.Exception.Message)"
 }

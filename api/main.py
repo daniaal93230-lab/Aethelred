@@ -446,7 +446,13 @@ def save_settings(obj):
     SETTINGS_PATH.write_text(json.dumps(obj, indent=2), encoding="utf-8")
 
 
-app = FastAPI(title="Aethelred API")  # <â€” named 'app' for uvicorn
+_qa_like = os.getenv("QA_DEV_ENGINE") == "1" or os.getenv("MODE") == "paper"
+app = FastAPI(
+    title="Aethelred API",
+    openapi_url=("/openapi.json" if _qa_like else None),
+    docs_url=("/docs" if _qa_like else None),
+    redoc_url=("/redoc" if _qa_like else None),
+)
 try:
     from api.routes import router as _routes_router
 
