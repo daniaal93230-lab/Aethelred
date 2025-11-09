@@ -368,8 +368,51 @@
         "tags": [
           "runtime"
         ],
-        "summary": "Runtime Account Runtime Json",
-        "operationId": "runtime_account_runtime_json_runtime_account_runtime_json_get",
+        "summary": "Account Runtime",
+        "operationId": "account_runtime_runtime_account_runtime_json_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Account Runtime Runtime Account Runtime Json Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runtime/inspect_engine.json": {
+      "get": {
+        "tags": [
+          "runtime"
+        ],
+        "summary": "Runtime Inspect Engine",
+        "description": "Diagnostic inspector (QA/private). The route is always registered but\nwill return 404 if QA flags are not present in the process environment.\nThis avoids race conditions where envs at import time may differ from\nthose seen at runtime while keeping the endpoint hidden in non-QA runs.",
+        "operationId": "runtime_inspect_engine_runtime_inspect_engine_json_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runtime/inspect_env.json": {
+      "get": {
+        "tags": [
+          "runtime"
+        ],
+        "summary": "Runtime Inspect Env",
+        "operationId": "runtime_inspect_env_runtime_inspect_env_json_get",
         "responses": {
           "200": {
             "description": "Successful Response",

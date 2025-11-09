@@ -224,7 +224,7 @@
     },
     {
       "path": "README.md",
-      "size": 2374,
+      "size": 5122,
       "first_line": "# Aethelred",
       "docstring": null
     },
@@ -290,13 +290,13 @@
     },
     {
       "path": "api/main.py",
-      "size": 72940,
+      "size": 73138,
       "first_line": "# api/main.py",
       "docstring": null
     },
     {
       "path": "api/openapi.json",
-      "size": 38305,
+      "size": 39722,
       "first_line": "{",
       "docstring": null
     },
@@ -356,7 +356,7 @@
     },
     {
       "path": "api/routes/runtime.py",
-      "size": 3258,
+      "size": 18598,
       "first_line": "from __future__ import annotations",
       "docstring": null
     },
@@ -1004,8 +1004,8 @@
     },
     {
       "path": "exports_download/decisions.csv",
-      "size": 73284,
-      "first_line": "ts,symbol,strategy,regime,signal,intent,size_usd,price,ml_p_up,ml_vote,veto,reasons,planned_stop,planned_tp,run_id",
+      "size": 152,
+      "first_line": "ts,symbol,regime,strategy_name,signal_side,signal_strength,signal_stop_hint,signal_ttl,final_action,final_size,veto_ml,veto_risk,veto_reason,price,note",
       "docstring": null
     },
     {
@@ -1075,6 +1075,12 @@
       "docstring": null
     },
     {
+      "path": "netstat_full.txt",
+      "size": 57841,
+      "first_line": "",
+      "docstring": null
+    },
+    {
       "path": "ops/__init__.py",
       "size": 0,
       "first_line": "",
@@ -1106,7 +1112,7 @@
     },
     {
       "path": "repo_index_compact.json",
-      "size": 49505,
+      "size": 50296,
       "first_line": "{",
       "docstring": null
     },
@@ -1172,8 +1178,8 @@
     },
     {
       "path": "runtime/news_items.json",
-      "size": 25420,
-      "first_line": "[{\"title\": \"Bitcoin 'money vessel' amasses $8B but recovery lacks ETF inflows\", \"link\": \"https://cointelegraph.com/news/bitcoin-money-vessel-8b-recovery-lacks-etf?utm_source=rss_feed&utm_medium=rss&ut",
+      "size": 25081,
+      "first_line": "[{\"title\": \"Trump announces $2,000 tariff 'dividend,' here is how it will affect crypto\", \"link\": \"https://cointelegraph.com/news/trump-2000-tariff-dividend-affect-crypto?utm_source=rss_feed&utm_mediu",
       "docstring": null
     },
     {
@@ -1444,6 +1450,12 @@
       "path": "sol_metrics.csv",
       "size": 644,
       "first_line": "ts,exchange,symbol,interval,strategy,signal,price,bars_used,ann_return,ann_vol,sharpe_ann,max_drawdown,win_rate_bar,profit_factor_bar,trade_count,avg_bar_return,paper_equity",
+      "docstring": null
+    },
+    {
+      "path": "stop",
+      "size": 12,
+      "first_line": "ServiceName",
       "docstring": null
     },
     {
@@ -1765,9 +1777,57 @@
       "docstring": null
     },
     {
+      "path": "tools/diagnose_8080.ps1",
+      "size": 3577,
+      "first_line": "# One-shot diagnostics for 127.0.0.1:8080",
+      "docstring": null
+    },
+    {
       "path": "tools/export_ohlcv_csv.py",
       "size": 1855,
       "first_line": "from __future__ import annotations",
+      "docstring": null
+    },
+    {
+      "path": "tools/fetch_inspect.ps1",
+      "size": 275,
+      "first_line": "Set-Location 'C:\\Code\\Aethelred'",
+      "docstring": null
+    },
+    {
+      "path": "tools/fetch_openapi.ps1",
+      "size": 248,
+      "first_line": "Set-Location 'C:\\Code\\Aethelred'",
+      "docstring": null
+    },
+    {
+      "path": "tools/fetch_runtime.ps1",
+      "size": 282,
+      "first_line": "Set-Location 'C:\\Code\\Aethelred'",
+      "docstring": null
+    },
+    {
+      "path": "tools/find_port_owner.ps1",
+      "size": 725,
+      "first_line": "param(",
+      "docstring": null
+    },
+    {
+      "path": "tools/git_commit_specific_and_push.ps1",
+      "size": 831,
+      "first_line": "Set-Location 'C:\\Code\\Aethelred'",
+      "docstring": null
+    },
+    {
+      "path": "tools/git_commit_target_push.ps1",
+      "size": 1314,
+      "first_line": "Set-Location 'C:\\Code\\Aethelred'",
+      "docstring": null
+    },
+    {
+      "path": "tools/git_force_push_with_stash.ps1",
+      "size": 1386,
+      "first_line": "Set-Location 'C:\\Code\\Aethelred'",
       "docstring": null
     },
     {
@@ -1783,15 +1843,33 @@
       "docstring": null
     },
     {
+      "path": "tools/port_guard.ps1",
+      "size": 5341,
+      "first_line": "<#",
+      "docstring": null
+    },
+    {
+      "path": "tools/post_reboot_check.ps1",
+      "size": 3024,
+      "first_line": "# Post-reboot diagnostic for port 8080",
+      "docstring": null
+    },
+    {
       "path": "tools/seed_paper_state.py",
       "size": 953,
       "first_line": "import os",
       "docstring": null
     },
     {
+      "path": "tools/start_paper.ps1",
+      "size": 3031,
+      "first_line": "Param(",
+      "docstring": null
+    },
+    {
       "path": "tools/stop_supervised_run.ps1",
-      "size": 1990,
-      "first_line": "Set-Location 'C:\\Code\\Aethelred'",
+      "size": 2354,
+      "first_line": "param(",
       "docstring": null
     },
     {
