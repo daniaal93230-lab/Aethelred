@@ -13,7 +13,7 @@ def engine():
 
 
 @patch("core.execution_engine.simple_moving_average_strategy")
-@patch("bot.exchange.Exchange.fetch_ohlcv")
+@patch("core.execution_engine.Exchange.fetch_ohlcv")
 @patch("core.execution_engine.DBManager.insert_trade")
 def test_run_once_buy_signal(mock_insert, mock_fetch, mock_strategy, engine):
     mock_fetch.return_value = [
@@ -36,7 +36,7 @@ def test_run_once_buy_signal(mock_insert, mock_fetch, mock_strategy, engine):
 
 
 @patch("core.execution_engine.simple_moving_average_strategy")
-@patch("bot.exchange.Exchange.fetch_ohlcv")
+@patch("core.execution_engine.Exchange.fetch_ohlcv")
 @patch("core.execution_engine.DBManager.insert_trade")
 def test_run_once_sell_signal(mock_insert, mock_fetch, mock_strategy, engine):
     mock_fetch.return_value = [

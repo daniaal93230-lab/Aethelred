@@ -8,7 +8,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from db.db_manager import init_db, set_cash  # noqa: E402
-from bot.exchange import PaperExchange  # noqa: E402
+from exchange import PaperExchange  # noqa: E402
 
 
 def main():

@@ -12,14 +12,14 @@ def expected_calibration_error(
     bins = np.linspace(0.0, 1.0, n_bins + 1)
     idx = np.digitize(y_prob, bins) - 1
     idx = np.clip(idx, 0, n_bins - 1)
-    ece = 0.0
+    ece: float = 0.0
     for b in range(n_bins):
         mask = idx == b
         if not np.any(mask):
             continue
-        conf = np.mean(y_prob[mask])
-        acc = np.mean(y_true[mask])
-        w = np.mean(mask.astype(float))
+        conf = float(np.mean(y_prob[mask]))
+        acc = float(np.mean(y_true[mask]))
+        w = float(np.mean(mask.astype(float)))
         ece += w * abs(acc - conf)
     return float(ece)
 
@@ -37,6 +37,7 @@ def tune_threshold_by_ece(
         grid = np.linspace(0.2, 0.8, 25)
     best = None
     best_t = 0.5
+    best_metrics: Dict[str, float] = {"ece": 0.0, "precision": 0.0, "recall": 0.0}
     from sklearn.metrics import precision_score, recall_score
 
     for t in grid:
@@ -50,4 +51,4 @@ def tune_threshold_by_ece(
             best = score
             best_t = float(t)
             best_metrics = {"ece": float(ece), "precision": float(prec), "recall": float(rec)}
-    return best_t, best_metrics  # type: ignore
+    return best_t, best_metrics

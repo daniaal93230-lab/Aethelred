@@ -1,231 +1,140 @@
-from __future__ import annotations
-import asyncio, os, time
-from dataclasses import dataclass, asdict
-from typing import Any, Dict, List, Optional
+from fastapi import APIRouter, Request
+from utils.logger import logger
 
-import ccxt.async_support as ccxt  # type: ignore
-import pandas as pd
-from fastapi import FastAPI
-from utils.snapshot import write_runtime_snapshot
+"""
+Paper Bot (DI-refactored)
+---------------------------------------
+This module now runs *entirely* through dependency injection.
+No global state.
+No @app.on_event.
+No hidden background loops.
 
-# ---------------- Config (env with defaults) ----------------
-MODE = os.getenv("MODE", "PAPER")  # PAPER only in this module
-EXCHANGE = os.getenv("EXCHANGE", "binance")
-SYMBOLS = [s.strip() for s in os.getenv("SYMBOLS", "BTC/USDT").split(",") if s.strip()]
-TIMEFRAME = os.getenv("TIMEFRAME", "1m")
-POLL_SEC = int(os.getenv("POLL_SEC", "10"))
-RISK_PCT = float(os.getenv("RISK_PCT", "0.02"))
-LEVERAGE_MAX = float(os.getenv("LEVERAGE_MAX", "2"))
-ALLOW_SHORTS = os.getenv("ALLOW_SHORTS", "false").lower() == "true"
-START_ENGINE = os.getenv("START_ENGINE", "true").lower() == "true"
-STARTING_CASH = float(os.getenv("PAPER_STARTING_CASH", "10000"))
+Your engine is created in lifespan.py → Services.paper_engine
+and injected here via request.app.state.services.
 
+FUTURE REMINDER (for LLM + human):
+----------------------------------
+The long-term architecture will support:
 
-# ---------------- Paper broker ----------------
-@dataclass
-class Position:
-    symbol: str
-    side: str  # "long" | "short"
-    qty: float
-    entry: float
+• Unified PaperEngine / LiveEngine interface
+• Order simulation layer (fees, slippage, latency)
+• Futures engine with isolated margin tracking
+• Replay mode via deterministic market-state stream
+• DI-driven multi-engine orchestrator
+• Asynchronous execution queue
 
-    def unrealized(self, last: float) -> float:
-        return (last - self.entry) * self.qty if self.side == "long" else (self.entry - last) * abs(self.qty)
+This module intentionally stays minimal until the
+Futures Engine Architecture is introduced.
+"""
+
+router = APIRouter(tags=["paper"])
 
 
-@dataclass
-class Trade:
-    ts: float
-    symbol: str
-    side: str  # "buy" | "sell"
-    qty: float
-    price: float
-    pnl: float = 0.0
-
-
-class PaperBroker:
-    def __init__(self, starting_cash: float, allow_shorts: bool = False, fee_bps: float = 5.0):
-        self.cash = starting_cash
-        self.allow_shorts = allow_shorts
-        self.fee_bps = fee_bps
-        self.positions: Dict[str, Position] = {}
-        self.trades: List[Trade] = []
-
-    def equity(self, last_prices: Dict[str, float]) -> float:
-        eq = self.cash
-        for p in self.positions.values():
-            last = last_prices.get(p.symbol)
-            if last is not None:
-                eq += p.unrealized(last)
-        return eq
-
-    def positions_snapshot(self) -> Dict[str, dict]:
-        return {k: asdict(v) for k, v in self.positions.items()}
-
-    def trades_snapshot(self) -> List[dict]:
-        return [asdict(t) for t in self.trades[-200:]]
-
-    def market_open(self, symbol: str, side: str, notional: float, last: float) -> Trade:
-        if side == "short" and not self.allow_shorts:
-            raise ValueError("Shorts disabled")
-        if symbol in self.positions:
-            raise ValueError("Position already open")
-        qty = notional / last
-        fee = last * qty * (self.fee_bps / 10_000)
-        self.cash -= fee
-        self.positions[symbol] = Position(symbol, side, qty if side == "long" else -qty, last)
-        tr = Trade(time.time(), symbol, "buy" if side == "long" else "sell", qty, last, pnl=-fee)
-        self.trades.append(tr)
-        return tr
-
-    def market_close(self, symbol: str, last: float) -> Optional[Trade]:
-        pos = self.positions.pop(symbol, None)
-        if not pos:
-            return None
-        side = "sell" if pos.side == "long" else "buy"
-        pnl = pos.unrealized(last)
-        fee = last * abs(pos.qty) * (self.fee_bps / 10_000)
-        self.cash += pnl - fee
-        tr = Trade(time.time(), symbol, side, abs(pos.qty), last, pnl=pnl - fee)
-        self.trades.append(tr)
-        return tr
-
-
-# ---------------- Strategy: EMA crossover ----------------
-class EmaCross:
-    def __init__(self, fast: int = 12, slow: int = 26, allow_shorts: bool = False):
-        self.fast, self.slow, self.allow_shorts = fast, slow, allow_shorts
-
-    def signal(self, candles: pd.DataFrame) -> str:
-        if len(candles) < max(self.fast, self.slow) + 2:
-            return "flat"
-        c = candles["close"]
-        ema_f = c.ewm(span=self.fast, adjust=False).mean()
-        ema_s = c.ewm(span=self.slow, adjust=False).mean()
-        up = ema_f.iloc[-2] <= ema_s.iloc[-2] and ema_f.iloc[-1] > ema_s.iloc[-1]
-        dn = ema_f.iloc[-2] >= ema_s.iloc[-2] and ema_f.iloc[-1] < ema_s.iloc[-1]
-        if up:
-            return "long"
-        if self.allow_shorts and dn:
-            return "short"
-        return "flat"
-
-
-def _candles_df(raw: List[List[float]]) -> pd.DataFrame:
-    return pd.DataFrame(raw, columns=["timestamp", "open", "high", "low", "close", "volume"])
-
-
-# ---------------- Engine ----------------
-class TradingEngine:
-    def __init__(self) -> None:
-        self.exchange = getattr(ccxt, EXCHANGE)({"enableRateLimit": True})
-        self.strategy = EmaCross(allow_shorts=ALLOW_SHORTS)
-        self.broker = PaperBroker(STARTING_CASH, allow_shorts=ALLOW_SHORTS)
-        self._last_prices: Dict[str, float] = {}
-        self._stop = asyncio.Event()
-
-    async def run(self) -> None:
-        try:
-            while not self._stop.is_set():
-                await self._tick()
-                await asyncio.sleep(POLL_SEC)
-        finally:
-            await self.exchange.close()
-
-    async def _tick(self) -> None:
-        for symbol in SYMBOLS:
-            try:
-                ohlcv = await self.exchange.fetch_ohlcv(symbol, timeframe=TIMEFRAME, limit=200)
-                if not ohlcv:
-                    continue
-                df = _candles_df(ohlcv)
-                last = float(df["close"].iloc[-1])
-                self._last_prices[symbol] = last
-                sig = self.strategy.signal(df)
-                pos = self.broker.positions.get(symbol)
-                if sig == "long":
-                    if not pos:
-                        self._open(symbol, "long", last)
-                    elif pos.side == "short":
-                        self.broker.market_close(symbol, last)
-                        self._open(symbol, "long", last)
-                elif sig == "short" and ALLOW_SHORTS:
-                    if not pos:
-                        self._open(symbol, "short", last)
-                    elif pos.side == "long":
-                        self.broker.market_close(symbol, last)
-                        self._open(symbol, "short", last)
-                else:
-                    if pos:
-                        self.broker.market_close(symbol, last)
-            except Exception:
-                continue
-
-    def _open(self, symbol: str, side: str, last: float) -> None:
-        equity = self.broker.equity(self._last_prices)
-        notional = max(0.0, equity * RISK_PCT * LEVERAGE_MAX)
-        if notional > 0:
-            self.broker.market_open(symbol, side, notional, last)
-
-    def status(self) -> Dict[str, Any]:
-        eq = self.broker.equity(self._last_prices)
-        return {
-            "mode": MODE,
-            "exchange": EXCHANGE,
-            "symbols": SYMBOLS,
-            "timeframe": TIMEFRAME,
-            "poll_sec": POLL_SEC,
-            "cash": round(self.broker.cash, 2),
-            "equity": round(eq, 2),
-            "risk_pct": RISK_PCT,
-            "leverage_max": LEVERAGE_MAX,
-            "allow_shorts": ALLOW_SHORTS,
-        }
-
-
-# ---------------- FastAPI ----------------
-app = FastAPI(title="Aethelred Paper Bot")
-_engine: TradingEngine | None = None
-
-
-@app.on_event("startup")
-async def _startup() -> None:
-    global _engine
-    if START_ENGINE:
-        _engine = TradingEngine()
-        asyncio.create_task(_engine.run())
-
-
-# after each completed cycle, persist runtime snapshot using the engine
-# app.state.engine must expose account_snapshot()
-def on_cycle_complete():
+def get_paper_engine(request: Request):
+    """Dependency helper to fetch DI-injected paper engine."""
     try:
-        write_runtime_snapshot(app.state.engine)
+        return request.app.state.services.paper_engine
     except Exception:
-        pass
+        raise RuntimeError("Paper engine not registered in app.state.services")
 
 
-@app.get("/health")
-def health() -> dict:
-    return {"status": "ok"}
+@router.get("/paper/start")
+def start_paper_bot(request: Request):
+    """
+    Starts the paper engine’s background loop via DI.
+    """
+    engine = get_paper_engine(request)
+    logger.info("Starting DI-driven paper engine loop...")
+    engine.start_background_loop()
+    return {"status": "ok", "detail": "paper engine loop started"}
 
 
-@app.get("/status")
-def status() -> Dict[str, Any]:
-    if not _engine:
-        return {"engine": "stopped"}
-    return _engine.status()
+@router.get("/paper/status")
+def paper_status(request: Request):
+    """
+    Returns engine status.
+    """
+    engine = get_paper_engine(request)
+    return engine.status()
 
 
-@app.get("/positions")
-def positions() -> Dict[str, Any]:
-    if not _engine:
-        return {}
-    return _engine.broker.positions_snapshot()
+@router.get("/paper/positions")
+def paper_positions(request: Request):
+    """
+    Returns open paper-trading positions.
+    """
+    engine = get_paper_engine(request)
+    return engine.list_positions()
 
 
-@app.get("/trades")
-def trades() -> Dict[str, Any]:
-    if not _engine:
-        return {"trades": []}
-    return {"trades": _engine.broker.trades_snapshot()}
+@router.get("/paper/trades")
+def paper_trades(request: Request):
+    """
+    Returns executed paper trades.
+    """
+    engine = get_paper_engine(request)
+    return engine.list_trades()
+
+
+@router.post("/paper/step")
+def paper_step(request: Request):
+    """
+    Runs a single step of the execution engine (mock/testing).
+    """
+    engine = get_paper_engine(request)
+
+    try:
+        result = engine.run_once(is_mock=True)
+    except Exception as e:
+        logger.exception("Paper engine step failed")
+        return {"ok": False, "error": str(e)}
+
+    return {"ok": True, "result": result}
+
+
+@router.get("/paper/next_signal")
+def next_signal(request: Request, symbol: str = "BTC/USDT"):
+    """
+    Return the next signal for the given symbol.
+
+    Query param `test=1` preserves legacy SMA test semantics (raw string).
+    Production routes through engine strategos when available.
+    """
+    engine = None
+    try:
+        engine = get_paper_engine(request)
+    except Exception:
+        # attempt to read from app.state.services.engine as fallback
+        services = getattr(request.app.state, "services", None)
+        engine = getattr(services, "engine", None) if services else None
+
+    if engine is None:
+        raise RuntimeError("Paper engine not registered")
+
+    testing = request.query_params.get("test") == "1"
+
+    exch = getattr(engine, "exchange", None) or getattr(engine, "_exch", None)
+    if exch is None:
+        raise RuntimeError("Exchange unavailable")
+
+    try:
+        ohlcv = exch.fetch_ohlcv(symbol)
+    except Exception:
+        ohlcv = []
+
+    if testing:
+        from core.trade_logic import simple_moving_average_strategy
+
+        raw = simple_moving_average_strategy(ohlcv)
+        return {"raw": raw}
+
+    strategos = getattr(engine, "_strategos", None) or getattr(engine, "strategos", None)
+    if strategos is None:
+        # fallback to SMA
+        from core.trade_logic import simple_moving_average_strategy
+
+        raw = simple_moving_average_strategy(ohlcv)
+        return {"raw": raw}
+
+    typed = strategos.route(ohlcv)
+    return {"side": typed.side.value.lower(), "strength": typed.strength, "ttl": typed.ttl}

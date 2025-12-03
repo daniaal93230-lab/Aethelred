@@ -9,127 +9,196 @@ Env:
 """
 
 from __future__ import annotations
+
+import importlib
 import os
-import logging
+from typing import Dict
 from fastapi import FastAPI
 
 # Import the FastAPI app and engine building blocks
-from api.main import app as _app
-from db.db_manager import DBManager
-from risk.engine import RiskEngine
-from core.risk_config import get_risk_cfg
-from bot.exchange import Exchange
+# IMPORTANT: never import api.main here (creates circular import)
+from api.deps.engine import build_engine
+from api.core.orchestrator import MultiEngineOrchestrator, EngineOrchestrator
+from core.execution_engine import ExecutionEngine
+from utils.logger import logger
+
+# module-level app handle; created inside create_app()
+_app = None
 
 IDLE_SNAPSHOT_SEC = int(os.getenv("SNAPSHOT_IDLE_SEC", "15") or "15")
 
-log = logging.getLogger("bootstrap")
 
-
-class EngineOrchestrator:
-    """
-    Thin orchestrator surface that the API expects.
-    Wraps exchange, risk, and db to expose:
-      heartbeat, flatten_all, breakers_view, breakers_set,
-      iter_trades, enqueue_train, account_snapshot, realized_pnl_today_usd, trade_count_today
-    """
-
-    def __init__(self, exch: Exchange, risk: RiskEngine, db: DBManager, clock=None):
-        self._exch = exch
-        self._risk = risk
-        self._db = db
-        self._clock = clock
-        self._breakers = {"kill_switch": False, "manual_breaker": False, "daily_loss_tripped": False}
-        self._last_tick_ts = None
-
-    # -------- API surface --------
-    def heartbeat(self) -> dict:
-        # use exchange tick or db clock if available
-        try:
-            self._last_tick_ts = self._exch.last_tick_ts() or self._last_tick_ts
-        except Exception:
-            pass
-        pos = self._exch.open_positions()
-        return {"ok": True, "positions_count": len(pos), "last_tick_ts": self._last_tick_ts}
-
-    async def flatten_all(self, reason: str = "") -> dict:
-        return await self._exch.flatten_all(reason=reason)
-
-    def breakers_view(self) -> dict:
-        # merge risk breaker state if provided
-        state = dict(self._breakers)
-        try:
-            r = self._risk.state_view()
-            state.update({k: v for k, v in r.items() if k in ("kill_switch", "daily_loss_tripped")})
-        except Exception:
-            pass
-        return state
-
-    def breakers_set(self, kill_switch=None, manual_breaker=None, clear_daily_loss=None) -> dict:
-        if kill_switch is not None:
-            self._breakers["kill_switch"] = bool(kill_switch)
-            try:
-                self._risk.set_kill_switch(bool(kill_switch))
-            except Exception:
-                pass
-        if manual_breaker is not None:
-            self._breakers["manual_breaker"] = bool(manual_breaker)
-        if clear_daily_loss:
-            self._breakers["daily_loss_tripped"] = False
-            try:
-                self._risk.clear_daily_loss()
-            except Exception:
-                pass
-        return self.breakers_view()
-
-    def iter_trades(self):
-        yield from self._db.iter_trades()
-
-    def enqueue_train(self, job: str, notes: str | None = None):
-        return self._db.enqueue_job(kind="train", job=job, notes=notes)
-
-    def realized_pnl_today_usd(self) -> float:
-        try:
-            return float(self._db.realized_pnl_today_usd())
-        except Exception:
-            return 0.0
-
-    def trade_count_today(self) -> int:
-        try:
-            return int(self._db.trade_count_today())
-        except Exception:
-            return 0
-
-    def account_snapshot(self) -> dict:
-        # delegate to exchange for positions and balances
-        snap = self._exch.account_overview()
-        snap["ts"] = self._clock_now()
-        snap["realized_pnl_today_usd"] = self.realized_pnl_today_usd()
-        snap["trade_count_today"] = self.trade_count_today()
-        return snap
-
-    # -------- helpers --------
-    def _clock_now(self):
-        try:
-            return self._db.now_ts()
-        except Exception:
-            import time
-
-            return int(time.time())
+# The concrete orchestrator implementation is provided by
+# `api.core.orchestrator.Orchestrator` and re-exported as
+# `api.deps.orchestrator.EngineOrchestrator` (EngineOrchestrator imported above).
 
 
 def create_app() -> FastAPI:
-    os.environ["LIVE"] = os.getenv("LIVE", "1")
-    db = DBManager()
-    risk = RiskEngine(get_risk_cfg())
-    exch = Exchange(db=db, risk=risk)
-    engine = EngineOrchestrator(exch=exch, risk=risk, db=db)
-    _app.state.engine = engine
-    log.info("Real engine attached to app.state.engine")
-    # start idle snapshot loop via api.main’s helper
-    try:
-        from api.main import start_idle_snapshot_loop
+    """
+    Production bootstrap for uvicorn --factory.
+    Responsibilities:
+        • Build DI-backed DB/Risk/Exchange/Engine
+        • Attach to _app.state.services
+        • Attach Orchestrator as app.state.engine
+        • Leave startup/shutdown to lifespan.py
+    """
 
-        start_idle_snapshot_loop(_app, interval_sec=IDLE_SNAPSHOT_SEC)
-    except Exception as e:
-        log.warning("Idle snapshot loop not started: %s", e)
-    return _app
+    # ----------------------------------------------------
+    # Create FastAPI application instance (CRITICAL FIX)
+    # ----------------------------------------------------
+    global _app
+    _app = FastAPI()
+
+    os.environ["LIVE"] = os.getenv("LIVE", "1")
+
+    # ---------------------------
+    # Build the service container
+    # ---------------------------
+    services = type("Services", (), {})()
+
+    # DB is not required for paper mode — disable DB for now
+    services.db = None
+
+    # Risk Engine (canonical)
+    try:
+        import api.deps.risk as risk_mod
+
+        # Access dynamically so mypy does not require the attribute to exist
+        build_risk = getattr(risk_mod, "build_risk")
+        services.risk = build_risk(services.db)
+    except Exception:
+        services.risk = None
+
+    # Exchange (canonical)
+    try:
+        import api.deps.exchange as exch_mod
+
+        build_exchange = getattr(exch_mod, "build_exchange")
+        services.exchange = build_exchange(
+            db=services.db,
+            risk=services.risk,
+        )
+    except Exception:
+        services.exchange = None
+
+    # 3) Exchange
+    exchange = services.exchange
+
+    # ---------------------------------------------------------------------
+    # Patch PaperExchange to provide working OHLCV during PAPER mode
+    # ---------------------------------------------------------------------
+    from api.deps.settings import Settings, get_settings
+
+    # Prefer pre-attached settings if present AND correct type, else load canonical settings
+    raw_settings = getattr(services, "settings", None)
+    if isinstance(raw_settings, Settings):
+        settings: Settings = raw_settings
+    else:
+        settings = get_settings()
+
+    if getattr(settings, "PAPER", False):
+        try:
+            # Legacy Exchange includes a working OHLCV method — import via shim
+            from exchange import Exchange as LiveCompat
+
+            # no mypy-ignore needed
+            live = LiveCompat()
+
+            # Patch method directly
+            from typing import Any
+
+            def _patched_fetch_ohlcv(symbol: str) -> Any:
+                # LiveCompat supports CCXT-style OHLCV output
+                return live.fetch_ohlcv(symbol)
+
+            if exchange is not None:
+                exchange.fetch_ohlcv = _patched_fetch_ohlcv
+
+        except Exception as e:
+            print(f"[bootstrap] PaperExchange OHLCV patch failed: {e}")
+
+    # ------------------------------------------------------------------
+    # Build per-symbol engines + orchestrators (multi-symbol architecture)
+    # ------------------------------------------------------------------
+
+    exch_mod = importlib.import_module("exchange.paper")
+    PaperExchange = getattr(exch_mod, "PaperExchange")
+
+    # derive symbols: prefer settings.symbols if present, else env AET_SYMBOLS
+    raw = os.getenv("AET_SYMBOLS")
+    if raw:
+        symbols = [s.strip() for s in raw.split(",") if s.strip()]
+    else:
+        symbols = [getattr(settings, "symbol", "BTCUSDT")]
+
+    engines: Dict[str, ExecutionEngine] = {}
+    orchs: Dict[str, EngineOrchestrator] = {}
+
+    for sym in symbols:
+        logger.info("bootstrap_building_engine", extra={"symbol": sym})
+
+        exch = PaperExchange()
+        eng = build_engine(exchange=exch, settings=settings, symbol=sym)
+        engines[sym] = eng
+
+        orch = EngineOrchestrator(eng, sym)
+        orchs[sym] = orch
+
+    multi = MultiEngineOrchestrator(orchs)
+
+    # attach to application
+    _app.state.symbols = symbols
+    _app.state.engines = engines
+    _app.state.orchestrators = orchs
+    _app.state.multi_orch = multi
+
+    # populate a simple services container with useful references
+    try:
+        services.engines = engines
+        services.orchestrators = orchs
+        services.multi_orch = multi
+        services.exchange = exchange
+        services.portfolio_state = multi.portfolio_snapshot
+        import time
+
+        services.start_ts = time.time()
+    except Exception:
+        # best-effort only
+        pass
+
+    from api.routes.runtime import router as runtime_router
+
+    _app.include_router(runtime_router, prefix="")
+
+    # Configure ops notifier from settings when available (best-effort)
+    try:
+        from ops.notifier import notifier as ops_notifier
+
+        ops_notifier.telegram_token = getattr(settings, "telegram_token", None)
+        ops_notifier.telegram_chat_id = getattr(settings, "telegram_chat_id", None)
+        ops_notifier.slack_webhook = getattr(settings, "slack_webhook", None)
+    except Exception:
+        pass
+
+    @_app.on_event("startup")
+    async def _startup() -> None:
+        logger.info("bootstrap_startup_multi")
+        await multi.start_all()
+
+    @_app.on_event("shutdown")
+    async def _shutdown() -> None:
+        logger.info("bootstrap_shutdown_multi")
+        await multi.stop_all()
+
+    # Attach DI container
+    _app.state.services = services
+
+
+def services_or_none():
+    # during tests and import-time the main FastAPI app may not be available
+    try:
+        if _app is None:
+            return None
+        return _app.state.services
+    except Exception:
+        return None

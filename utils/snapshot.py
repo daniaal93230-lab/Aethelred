@@ -1,12 +1,12 @@
 import json
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 
 SNAPSHOT_PATH = Path("account_runtime.json")
 
 
-def _position_view(pos) -> Dict[str, Any]:
+def _position_view(pos: Dict[str, Any]) -> Dict[str, Any]:
     # pos expected fields: symbol, qty, entry, side, mark
     # mtm pnl percent computed as (mark - entry) / entry for long, inverse for short
     entry = pos.get("entry")
@@ -33,7 +33,7 @@ def _position_view(pos) -> Dict[str, Any]:
     }
 
 
-def write_runtime_snapshot(obj, extra: Dict[str, Any] | None = None) -> None:
+def write_runtime_snapshot(obj: Any, extra: Optional[Dict[str, Any]] = None) -> None:
     """
     Preferred: pass an engine that implements account_snapshot().
     Backward compatible: if obj is a dict, write it directly with mtm enrich when possible.
@@ -48,8 +48,17 @@ def write_runtime_snapshot(obj, extra: Dict[str, Any] | None = None) -> None:
     # realized pnl today and trade count if engine exposes helpers
     realized = getattr(obj, "realized_pnl_today_usd", None)
     trades_today = getattr(obj, "trade_count_today", None)
-    realized_today = float(realized()) if callable(realized) else acct.get("realized_pnl_today_usd")
-    trade_count = int(trades_today()) if callable(trades_today) else acct.get("trade_count_today")
+    # Normalize realized/trade_count to primitives when possible, otherwise None
+    try:
+        realized_val = realized() if callable(realized) else acct.get("realized_pnl_today_usd")
+        realized_today: Optional[float] = float(realized_val) if realized_val is not None else None
+    except Exception:
+        realized_today = None
+    try:
+        trade_val = trades_today() if callable(trades_today) else acct.get("trade_count_today")
+        trade_count: Optional[int] = int(trade_val) if trade_val is not None else None
+    except Exception:
+        trade_count = None
 
     snapshot = {
         "ts": acct.get("ts"),

@@ -8,20 +8,27 @@ def rolling_corr_guard(
     new_symbol: str,
     held_symbols: Iterable[str],
     lookback: int = 1440,   # 24h if 1m bars
-    threshold: float = 0.85
-) -> bool:
+    threshold: float = 0.85,
+    new_weight: float = 1.0,
+    portfolio_exposure: float = 0.0,
+) -> float:
     """
-    True if it is OK to enter new_symbol alongside held_symbols.
-    If any pair corr(new_symbol, held) >= threshold, return False.
-    Assumes returns_map contains aligned Series of percentage returns.
+    Correlation-aware guard that returns an adjusted weight for a proposed new position.
+
+    - If correlation with any held symbol exceeds the threshold and portfolio_exposure is
+      high, the returned weight is reduced proportionally to (1 - corr).
+    - Otherwise returns `new_weight` unchanged.
+
+    This keeps backward compatibility with callers that treat the result truthily
+    (non-zero => ok to proceed; zero => skip).
     """
     if not held_symbols:
-        return True
+        return new_weight
     if new_symbol not in returns_map:
-        return True
+        return new_weight
     r_new = returns_map[new_symbol].tail(lookback).dropna()
     if r_new.empty:
-        return True
+        return new_weight
     for s in held_symbols:
         r_old = returns_map.get(s)
         if r_old is None:
@@ -30,6 +37,7 @@ def rolling_corr_guard(
         if r_old.empty:
             continue
         corr = r_new.corr(r_old)
-        if pd.notna(corr) and corr >= threshold:
-            return False
-    return True
+        if pd.notna(corr) and corr > 0.8 and portfolio_exposure > 0.5:
+            # reduce the proposed weight when highly correlated and portfolio exposure is high
+            return new_weight * (1 - corr)
+    return new_weight

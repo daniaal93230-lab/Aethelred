@@ -1,9 +1,10 @@
 Param(
   [switch]$Watchdog,
   [switch]$Visor,
-  [string]$ApiHost = "127.0.0.1",
   [int]$Port = 8080,
-  [switch]$ForceKillPort
+  [string]$ApiHost = "127.0.0.1",
+  [switch]$ForceKillPort,
+  [int]$PaperCash = 0
 )
 
 Set-StrictMode -Version Latest
@@ -18,6 +19,7 @@ try {
   if (-not $env:MODE) { $env:MODE = "paper" }
   if (-not $env:SAFE_FLATTEN_ON_START) { $env:SAFE_FLATTEN_ON_START = "1" }
   if (-not $env:QA_DEV_ENGINE) { $env:QA_DEV_ENGINE = "1" }
+  if ($PaperCash -gt 0) { $env:PAPER_STARTING_CASH = [string]$PaperCash; Write-Host ("PAPER_STARTING_CASH set to {0}" -f $env:PAPER_STARTING_CASH) }
 
   if ($ForceKillPort) {
     function Test-IsAdmin {
@@ -47,6 +49,7 @@ try {
   $apiUrl = ("http://{0}:{1}" -f $ApiHost, $Port)
   Write-Host ("Starting API on {0} with MODE={1}, QA_DEV_ENGINE={2}..." -f $apiUrl, $env:MODE, $env:QA_DEV_ENGINE)
 
+  # Start uvicorn (API app). Use api.main:app so local QADevEngine attach behavior works.
   Start-Process -FilePath $py -ArgumentList @('-m','uvicorn','api.main:app','--host',"$ApiHost",'--port',"$Port") -WindowStyle Minimized
   Start-Sleep -Seconds 2
 

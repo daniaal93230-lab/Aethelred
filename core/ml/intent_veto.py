@@ -1,13 +1,14 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, cast
 import numpy as np
 from joblib import load
 
 
 class IntentVeto:
-    def __init__(self, path: str | Path):
-        pkg = load(path)
+    def __init__(self, path: str | Path) -> None:
+        # joblib.load may return untyped structures; cast to a typed dict
+        pkg = cast(Dict[str, Any], load(path))
         self.clf = pkg["clf"]
         self.cal = pkg["cal"]
         self.cols = pkg["feature_cols"]

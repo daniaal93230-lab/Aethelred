@@ -2,12 +2,13 @@ from dataclasses import dataclass
 import os
 import time
 import threading
-from typing import Callable, Dict, Any
+from typing import Callable, Dict, Any, cast
 from core.risk_config import get_risk_cfg as _legacy_get
 
 
 def load_risk_cfg() -> Dict[str, Any]:
-    return _legacy_get("config/risk.yaml")
+    # cast because legacy getter may be untyped; keep a typed contract here
+    return cast(Dict[str, Any], _legacy_get("config/risk.yaml"))
 
 
 _watcher_started = False
@@ -22,7 +23,7 @@ def on_risk_cfg_change(cb: Callable[[], None], path: str = "config/risk.yaml", i
     _watcher_started = True
     _watchers.append(cb)
 
-    def _loop():
+    def _loop() -> None:
         last = 0.0
         while True:
             try:

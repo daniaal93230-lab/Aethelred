@@ -4,7 +4,7 @@ import sqlite3
 from typing import Dict
 
 from db.db_manager import DB_PATH, init_db, _get_conn
-from bot.exchange import PaperExchange
+from exchange import PaperExchange
 
 
 def reset_db(starting_cash: float = 10000.0):

@@ -1,0 +1,985 @@
+from __future__ import annotations
+
+"""
+Minimal `api.main` used by tests. For runtime/server runs use the uvicorn factory
+`api.bootstrap_real_engine:create_app --factory` which attaches the real engine.
+This module exposes `app` so tests and local tooling can import routes.
+"""
+
+import os
+from fastapi import FastAPI
+
+# include the consolidated routes package (optional during tests)
+try:
+    from api.routes import router as _routes_router
+except Exception:
+    _routes_router = None
+
+_qa_like = os.getenv("QA_DEV_ENGINE") == "1" or os.getenv("MODE") == "paper"
+
+from __future__ import annotations
+"""
+Minimal, import-safe FastAPI app for tests and tools.
+Run the real server with the uvicorn factory:
+    uvicorn api.bootstrap_real_engine:create_app --factory
+"""
+import os
+from fastapi import FastAPI
+
+# Try to include consolidated routes, but stay import-safe for pytest
+try:
+    from api.routes import router as _routes_router
+except Exception:
+    _routes_router = None
+
+_qa_like = os.getenv("QA_DEV_ENGINE") == "1" or os.getenv("MODE") == "paper"
+
+app = FastAPI(
+    title="Aethelred API",
+    openapi_url="/openapi.json" if _qa_like else None,
+    docs_url="/docs" if _qa_like else None,
+    redoc_url="/redoc" if _qa_like else None,
+)
+
+if _routes_router is not None:
+    app.include_router(_routes_router)
+                await asyncio.sleep(max(60.0, (target - now).total_seconds()))
+                async with httpx.AsyncClient() as c:
+                    await c.get("http://127.0.0.1:8080/report/daily", timeout=10)
+            except Exception:
+                await asyncio.sleep(3600)
+
+    if os.getenv("ENABLE_DAILY_REPORT", "1").lower() not in ("0", "false", "no"):
+        asyncio.create_task(_daily_report_loop())
+
+
+# Lifespan handler for startup tasks (replaces deprecated on_event startup hooks)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # run the legacy startup helpers in order; each is resilient on its own
+    try:
+        await _maybe_attach_qa_engine()
+    except Exception:
+        pass
+    try:
+        await _safe_startup()
+    except Exception:
+        pass
+    try:
+        await _startup_idle_loop()
+    except Exception:
+        pass
+    try:
+        await _startup_news_loop()
+    except Exception:
+        pass
+    try:
+        yield
+    finally:
+        # Attempt to cancel the idle snapshot task if present
+        try:
+            _idle = globals().get("_idle_task")
+            # type-check: ensure we have an asyncio.Task before calling cancel
+            if _idle is not None and isinstance(_idle, asyncio.Task):
+                try:
+                    _idle.cancel()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+
+# Attach lifespan to app router so FastAPI uses it instead of deprecated on_event
+try:
+    app.router.lifespan_context = lifespan
+except Exception:
+    pass
+
+
+@app.get("/report/daily")
+def report_daily():
+    """
+    Returns a compact daily summary and pushes Telegram if env is set.
+    """
+    try:
+        series = load_equity_series(limit=1440)  # ~1 day of minute snapshots if recorded each loop
+        eq_now = float(series[-1][1]) if series else None
+        eq_start = float(series[0][1]) if series else None
+        pnl_abs = (eq_now - eq_start) if (eq_now is not None and eq_start is not None) else None
+        pnl_pct = (pnl_abs / eq_start * 100.0) if (pnl_abs is not None and eq_start and eq_start > 0) else None
+        stats = recent_stats_7d()
+        payload = {
+            "equity_start": eq_start,
+            "equity_now": eq_now,
+            "pnl_abs": pnl_abs,
+            "pnl_pct": pnl_pct,
+            "trades_7d": stats.get("trades_last_7d", 0),
+            "winrate_7d": stats.get("winrate_7d", None),
+            "expectancy_7d_usd": stats.get("expectancy_7d_usd", None),
+        }
+        # Telegram (optional)
+        if os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID"):
+            try:
+                if (
+                    eq_now is not None
+                    and eq_start is not None
+                    and payload.get("winrate_7d") is not None
+                    and payload.get("expectancy_7d_usd") is not None
+                ):
+                    msg = (
+                        f"<b>Aethelred Daily</b>\n"
+                        f"Equity: {eq_now:.2f} (start {eq_start:.2f})\n"
+                        f"PnL: {float(pnl_abs):+.2f} ({float(pnl_pct):+.2f}%)\n"
+                        f"7d trades: {payload['trades_7d']}, winrate: {(payload['winrate_7d'] * 100):.1f}% | exp: {payload['expectancy_7d_usd']:.2f}"
+                    )
+                else:
+                    msg = "<b>Aethelred Daily</b>\nNo sufficient stats yet."
+                send_telegram(msg)
+            except Exception:
+                pass
+        return payload
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Helpers
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _isfinite(x) -> bool:
+    try:
+        return math.isfinite(float(x))
+    except Exception:
+        return False
+
+
+def _sanitize(o):
+    if isinstance(o, dict):
+        return {k: _sanitize(v) for k, v in o.items()}
+    if isinstance(o, list):
+        return [_sanitize(v) for v in o]
+    if isinstance(o, float):
+        return None if not _isfinite(o) else float(o)
+    return o
+
+
+def _tail_csv(path: Path, n: int) -> str:
+    """Return last n rows (with header) of a CSV."""
+    if not path.exists():
+        return ""
+    try:
+        df = pd.read_csv(path)
+        if n > 0 and len(df) > n:
+            df = df.tail(n)
+        with io.StringIO() as buf:
+            df.to_csv(buf, index=False)
+            return buf.getvalue()
+    except Exception:
+        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        if not lines:
+            return ""
+        header, body = lines[0], lines[1:]
+        body = body[-n:] if n > 0 else body
+        return "\n".join([header] + body) + ("\n" if body else "")
+
+
+def _load_account_runtime() -> dict:
+    """Load account-level runtime snapshot if present."""
+    try:
+        p = RUNTIME_DIR / "account_runtime.json"
+        if p.exists():
+            # accept utf-8 with BOM
+            return json.loads(p.read_text(encoding="utf-8-sig"))
+    except Exception:
+        pass
+    return {}
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Static dashboard
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+if DASH_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=DASH_DIR), name="assets")
+
+
+@app.get("/", response_class=HTMLResponse)
+def home():
+    return HTMLResponse('<meta http-equiv="refresh" content="0; url=/dashboard/"/>', status_code=200)
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+@app.get("/dashboard/", response_class=HTMLResponse)
+def dashboard(mode: Optional[str] = Query(default=None, description="simple|advanced")):
+    html = DASHBOARD_HTML
+    # Allow overriding default simple/advanced via query or env
+    default_simple_env = os.getenv("DASHBOARD_SIMPLE", "1").lower() in ("1", "true", "yes")
+    if mode == "simple":
+        html = html.replace("const DEFAULT_SIMPLE = false;", "const DEFAULT_SIMPLE = true;")
+    elif mode == "advanced":
+        html = html.replace("const DEFAULT_SIMPLE = false;", "const DEFAULT_SIMPLE = false;")
+    else:
+        html = html.replace(
+            "const DEFAULT_SIMPLE = false;",
+            f"const DEFAULT_SIMPLE = {'true' if default_simple_env else 'false'};",
+        )
+    return HTMLResponse(html, status_code=200)
+
+
+@app.get("/runtime_path")
+def runtime_path():
+    return {"runtime_dir": str(RUNTIME_DIR)}
+
+
+@app.get("/runtime_files")
+def runtime_files():
+    files = []
+    if RUNTIME_DIR.exists():
+        for p in sorted(RUNTIME_DIR.glob("*_runtime.json")):
+            try:
+                files.append({"name": p.name, "size": p.stat().st_size})
+            except Exception:
+                continue
+    return {"runtime_dir": str(RUNTIME_DIR), "files": files}
+
+
+@app.post("/kill_switch/on")
+def kill_on():
+    try:
+        RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+        KILL_FILE.write_text("1", encoding="utf-8")
+        return {"kill": "on"}
+    except Exception:
+        return {"kill": "on", "ok": False}
+
+
+@app.post("/kill_switch/off")
+def kill_off():
+    try:
+        if KILL_FILE.exists():
+            KILL_FILE.unlink()
+        return {"kill": "off"}
+    except Exception:
+        return {"kill": "off", "ok": False}
+
+
+@app.get("/equity_chart.png")
+def equity_chart_png(limit: int = 2000):
+    """
+    Minimal PNG chart of equity from SQLite.
+    Falls back to a 1x1 transparent PNG if matplotlib is unavailable.
+    """
+    try:
+        import io
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ModuleNotFoundError:
+        # 1x1 transparent PNG
+        tiny = base64.b64decode(
+            b"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/ae0fGQAAAAASUVORK5CYII="
+        )
+        return Response(content=tiny, media_type="image/png")
+
+    try:
+        series = load_equity_series(limit=limit)
+    except Exception:
+        series = []
+    fig, ax = plt.subplots(figsize=(6, 2.2), dpi=160)
+    # transparent background so it blends with the dark page
+    fig.patch.set_alpha(0.0)
+    ax.set_facecolor((0, 0, 0, 0))
+    ax.tick_params(colors="#9ca3af", labelsize=7)
+    if series:
+        xs = [i for i, _ in enumerate(series)]
+        ys = [v for _, v in series]
+        if len(xs) == 1:
+            # pad to avoid "identical low/high xlims" and show a small line
+            xs = [0, 1]
+            ys = [ys[0], ys[0]]
+        ax.plot(xs, ys)
+        ax.set_xlim(0, max(1, len(xs) - 1))
+        ax.set_title("Equity", fontsize=9, color="#d1d5db")
+    else:
+        ax.set_title("Equity (no data)", fontsize=9, color="#9ca3af")
+    ax.grid(True, alpha=0.15)
+    for spine in ("top", "right", "left", "bottom"):
+        ax.spines[spine].set_visible(False)
+    buf = io.BytesIO()
+    fig.tight_layout()
+    fig.savefig(buf, format="png")
+    plt.close(fig)
+    return Response(content=buf.getvalue(), media_type="image/png")
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Metrics
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
+@app.get("/metrics")
+def list_metrics():
+    files = [p.name for p in METRICS_DIR.glob("*_metrics.csv")]
+    return {"metric_files": sorted(files)}
+
+
+@app.get("/metrics/{name}", response_class=PlainTextResponse)
+def get_metrics_csv(name: str, n: int = Query(200, ge=0, le=5000)):
+    path = METRICS_DIR / name
+    if not path.exists():
+        return PlainTextResponse("", status_code=404)
+    return PlainTextResponse(_tail_csv(path, n=n), status_code=200)
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Signals (combine all *_signal.json)
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
+@app.get("/signals")
+def get_signals():
+    data: dict[str, dict] = {}
+    for p in ROOT.glob("*_signal.json"):
+        try:
+            obj = json.loads(p.read_text(encoding="utf-8"))
+            data[p.name] = _sanitize(obj)
+        except Exception:
+            continue
+    return JSONResponse(data)
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Trades â€” closed last 24h + open positions
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
+def _col(df: pd.DataFrame, *options: str) -> Optional[str]:
+    """Find a column in df ignoring case."""
+    lower = {c.lower(): c for c in df.columns}
+    for o in options:
+        if o in lower:
+            return lower[o]
+    return None
+
+
+def _load_price_map_from_signals() -> dict[str, float]:
+    """Map symbol -> latest price from *_signal.json."""
+    mp: dict[str, float] = {}
+    for p in ROOT.glob("*_signal.json"):
+        try:
+            obj = json.loads(p.read_text(encoding="utf-8"))
+            sym = str(obj.get("symbol") or "").strip()
+            price = obj.get("price", None)
+            if sym and isinstance(price, (int, float)) and _isfinite(price):
+                mp[sym] = float(price)
+        except Exception:
+            continue
+    return mp
+
+
+def _detect_trades_and_open_positions(
+    ledger_path: Path,
+    price_map: dict[str, float],
+) -> Tuple[List[dict], List[dict]]:
+    """
+    From a ledger, reconstruct closed trades and open positions.
+    Assumes rows include (case-insensitive) columns: ts, signal, price, symbol(optional).
+    """
+    if not ledger_path.exists():
+        return [], []
+
+    try:
+        df = pd.read_csv(ledger_path)
+    except Exception:
+        return [], []
+
+    c_ts = _col(df, "ts", "timestamp", "time")
+    c_sig = _col(df, "signal")
+    c_price = _col(df, "price", "close")
+    c_sym = _col(df, "symbol", "pair")
+
+    if not all([c_ts, c_sig, c_price]):
+        return [], []
+
+    df[c_ts] = pd.to_datetime(df[c_ts], utc=True, errors="coerce")
+    df = df.dropna(subset=[c_ts])
+    df = df.sort_values(c_ts)
+
+    sig_map = {"LONG": 1, "SHORT": -1, "FLAT": 0}
+    df["_side"] = df[c_sig].astype(str).map(sig_map).fillna(0).astype(int)
+    df["_price"] = pd.to_numeric(df[c_price], errors="coerce").astype(float)
+    if c_sym:
+        df["_symbol"] = df[c_sym].astype(str)
+    else:
+        base = ledger_path.stem.split("_")[0].upper()
+        # best effort: infer like BTC_ledger.csv -> BTC/USDT (if your ledgers always have /USDT you can adjust)
+        df["_symbol"] = base
+
+    closed: List[dict] = []
+    pos = 0
+    entry_row = None
+
+    for _, row in df.iterrows():
+        s = int(row["_side"])
+        price = float(row["_price"])
+        ts = row[c_ts].to_pydatetime()
+        symbol = str(row["_symbol"])
+
+        if pos == 0 and s != 0:
+            pos = s
+            entry_row = row
+        elif pos != 0 and s != pos:
+            # close previous
+            entry_price = float(entry_row["_price"])
+            exit_price = price
+            side = "LONG" if pos > 0 else "SHORT"
+            pnl_pct = (exit_price / entry_price - 1.0) * (1 if pos > 0 else -1)
+            hold_mins = (ts - entry_row[c_ts].to_pydatetime()).total_seconds() / 60.0
+
+            closed.append(
+                {
+                    "symbol": symbol,
+                    "side": side,
+                    "entry_time": entry_row[c_ts].to_pydatetime().isoformat(),
+                    "exit_time": ts.isoformat(),
+                    "entry_price": float(round(entry_price, 8)),
+                    "exit_price": float(round(exit_price, 8)),
+                    "pnl_pct": float(pnl_pct),
+                    "holding_mins": float(round(hold_mins, 2)),
+                }
+            )
+
+            # flip?
+            pos = s
+            entry_row = row if s != 0 else None
+
+    # any open position?
+    opens: List[dict] = []
+    if pos != 0 and entry_row is not None:
+        symbol = str(entry_row["_symbol"])
+        entry_price = float(entry_row["_price"])
+        side = "LONG" if pos > 0 else "SHORT"
+
+        # current price: prefer signals, else last ledger price
+        cur_price = price_map.get(symbol, float(df.iloc[-1]["_price"]))
+        pnl_unreal = (cur_price / entry_price - 1.0) * (1 if pos > 0 else -1)
+        hold_mins = (_now_utc() - entry_row[c_ts].to_pydatetime()).total_seconds() / 60.0
+
+        opens.append(
+            {
+                "symbol": symbol,
+                "side": side,
+                "entry_time": entry_row[c_ts].to_pydatetime().isoformat(),
+                "entry_price": float(round(entry_price, 8)),
+                "current_price": float(round(cur_price, 8)),
+                "unrealized_pct": float(pnl_unreal),
+                "holding_mins": float(round(hold_mins, 2)),
+            }
+        )
+
+    return closed, opens
+
+
+def _gather_last24h(pattern: str, symbol: Optional[str]) -> dict:
+    since = _now_utc() - timedelta(days=1)
+    price_map = _load_price_map_from_signals()
+
+    closed_all: List[dict] = []
+    open_all: List[dict] = []
+
+    for path in ROOT.glob(pattern):
+        closed, opens = _detect_trades_and_open_positions(path, price_map)
+        for t in closed:
+            if datetime.fromisoformat(t["exit_time"].replace("Z", "+00:00")) >= since:
+                if symbol is None or t["symbol"] == symbol:
+                    closed_all.append(t)
+        for p in opens:
+            if symbol is None or p["symbol"] == symbol:
+                open_all.append(p)
+
+    closed_all.sort(key=lambda r: r["exit_time"], reverse=True)
+    open_all.sort(key=lambda r: r["entry_time"], reverse=True)
+
+    # closed summary
+    total = len(closed_all)
+    wins = sum(1 for r in closed_all if r.get("pnl_pct", 0.0) > 0)
+    pnl_sum = sum(r.get("pnl_pct", 0.0) for r in closed_all)
+    avg_pnl = (pnl_sum / total) if total else 0.0
+    win_rate = (wins / total) if total else 0.0
+
+    return _sanitize(
+        {
+            "as_of": _now_utc().isoformat(),
+            "window": "24h",
+            "closed_summary": {
+                "count": total,
+                "win_rate": win_rate,
+                "pnl_sum": pnl_sum,
+                "pnl_avg": avg_pnl,
+            },
+            "closed": closed_all,
+            "open": open_all,
+        }
+    )
+
+
+@app.get("/trades/last24h")
+def trades_last24h(pattern: str = Query("*_ledger.csv"), symbol: Optional[str] = Query(None)):
+    """Closed trades in last 24h + current open positions."""
+    return JSONResponse(_gather_last24h(pattern=pattern, symbol=symbol))
+
+
+@app.get("/news_state")
+def news_state():
+    try:
+        p = RUNTIME_DIR / "news_state.json"
+        if not p.exists():
+            return {"multiplier": 1.0, "updated": None}
+        data = json.loads(p.read_text(encoding="utf-8-sig"))
+        return {
+            "multiplier": float(data.get("multiplier", 1.0)),
+            "updated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(p.stat().st_mtime)),
+        }
+    except Exception:
+        return {"multiplier": 1.0, "updated": None}
+
+
+@app.get("/news")
+def news_items(limit: int = 20):
+    try:
+        p = RUNTIME_DIR / "news_items.json"
+        if not p.exists():
+            return []
+        items = json.loads(p.read_text(encoding="utf-8-sig"))
+        return items[-int(limit) :]
+    except Exception:
+        return []
+
+
+@app.get("/metrics_json")
+def metrics_json(debug: int = 0):
+    """
+    Return a compact dashboard JSON:
+      now, equity, cash, exposure_usd, breaker, regimes, intents, positions, trades_last_24h, winrate_7d, expectancy_7d_usd
+    Data is stitched from existing CSVs if present. Falls back to zeros.
+    """
+    now = _now_utc()
+    # try last24h summary
+    summary = _gather_last24h(pattern="*_ledger.csv", symbol=None)
+
+    # Prefer account-level runtime snapshot if available
+    acct = _load_account_runtime()
+    equity = float(acct.get("equity", 0.0) or 0.0)
+    cash = float(acct.get("cash", 0.0) or 0.0)
+    exposure = float(acct.get("exposure_usd", 0.0) or 0.0)
+    positions_raw = acct.get("positions") or []
+    # Normalize positions to richer fields consumed by dashboard
+    positions = []
+    for p in positions_raw:
+        try:
+            positions.append(
+                {
+                    "symbol": p.get("symbol"),
+                    "side": p.get("side"),
+                    "qty": float(p.get("qty", 0.0) or 0.0),
+                    "entry_price": float(p.get("avg_price", p.get("entry", 0.0)) or 0.0),
+                    "current_price": float(p.get("market_price", p.get("price", 0.0)) or 0.0),
+                    "unrealized_pct": float(p.get("unrealized_pct", 0.0) or 0.0),
+                    "holding_mins": float(p.get("holding_mins", 0.0) or 0.0),
+                }
+            )
+        except Exception:
+            continue
+    if not positions:
+        # fallback to open positions reconstructed from ledgers
+        positions = summary.get("open", [])
+        # exposure approximation from open positions
+        exposure = 0.0
+        for p in positions:
+            try:
+                qty = float(p.get("qty") or (p.get("amount") or 0.0))
+                price = float(p.get("price") or p.get("current_price") or 0.0)
+                exposure += abs(qty * price)
+            except Exception:
+                continue
+
+    closed = summary.get("closed_summary", {})
+    trades24 = int(closed.get("count", 0))
+    winrate7 = float(closed.get("win_rate", 0.0) or 0.0)
+    expectancy7 = float(closed.get("pnl_avg", 0.0) or 0.0)
+    # prefer DB stats if available
+    try:
+        s = recent_stats_7d()
+        if s.get("trades_last_7d", 0) > 0:
+            winrate7 = float(s.get("winrate_7d", winrate7))
+            expectancy7 = float(s.get("expectancy_7d_usd", expectancy7))
+            trades24 = max(trades24, int(s.get("trades_last_7d", 0)))
+    except Exception:
+        pass
+
+    # augment with runtime snapshots if available
+    regimes: dict[str, str] = {}
+    intents: dict[str, str] = {}
+    strategies: dict[str, str] = {}
+    planned: dict[str, dict] = {}
+    ml: dict[str, dict[str, object]] = {}
+    gate_reason: dict[str, str] = {}
+    breaker = {"active": False, "cooldown_remaining_sec": 0}
+    debug_files: List[str] = []
+    debug_errors: List[str] = []
+    debug_info = {"runtime_dir": str(RUNTIME_DIR), "files_seen": debug_files, "errors": debug_errors} if debug else None
+    try:
+        if RUNTIME_DIR.exists():
+            for p in RUNTIME_DIR.glob("*_runtime.json"):
+                try:
+                    if debug_info is not None:
+                        debug_files.append(p.name)
+                    # PowerShell often writes UTF-8 with BOM; accept both.
+                    with open(p, "r", encoding="utf-8-sig") as fh:
+                        raw = fh.read()
+                    obj = json.loads(raw)
+                    sym = str(obj.get("symbol") or "")
+                    if not sym:
+                        continue
+                    if "regime" in obj:
+                        regimes[sym] = str(obj["regime"]) or "unknown"
+                    if "intent" in obj:
+                        intents[sym] = str(obj["intent"]) or "hold"
+                    if "strategy" in obj:
+                        strategies[sym] = str(obj["strategy"]) or "unknown"
+                    stp = obj.get("planned_stop")
+                    tp = obj.get("planned_tp")
+                    if stp is not None or tp is not None:
+                        planned[sym] = {"stop": stp, "tp": tp}
+                    if ("ml_p_up" in obj) or ("ml_vote" in obj):
+                        ml[sym] = {"p_up": obj.get("ml_p_up"), "vote": obj.get("ml_vote")}
+                    if isinstance(obj.get("gate_reason"), str) and obj.get("gate_reason"):
+                        gate_reason[sym] = str(obj.get("gate_reason"))
+                    if "breaker" in obj and isinstance(obj["breaker"], dict):
+                        # simple OR on active
+                        if bool(obj["breaker"].get("active")):
+                            breaker["active"] = True
+                except Exception as e:
+                    if debug_info is not None:
+                        debug_errors.append(str(e))
+                    continue
+    except Exception:
+        pass
+
+    # read news multiplier if background loop produced it
+    news_multiplier = 1.0
+    try:
+        p = RUNTIME_DIR / "news_state.json"
+        if p.exists():
+            news_multiplier = float(json.loads(p.read_text(encoding="utf-8-sig")).get("multiplier", 1.0))
+    except Exception:
+        pass
+
+    # derive simple portfolio gauges for risk display
+    equity_now = float(equity)
+    total_notional = float(exposure)
+    # Test/QA hook: if a module-level get_positions() is provided (e.g., monkeypatched in tests),
+    # use it to compute a synthetic total_notional_usd without touching the DB.
+    try:
+        gp = globals().get("get_positions")
+        if callable(gp):
+            lst = gp()
+            tot = 0.0
+            for it in lst or []:
+                try:
+                    n = it.get("notional_usd")
+                    if n is None:
+                        qty = float(it.get("qty") or 0.0)
+                        px = float(it.get("market_price", it.get("current_price", 0.0)) or 0.0)
+                        n = abs(qty * px)
+                    tot += float(n or 0.0)
+                except Exception:
+                    continue
+            # only override if we actually computed something meaningful
+            if tot > 0:
+                total_notional = float(tot)
+    except Exception:
+        pass
+    cfg = get_risk_cfg()
+    exp_cfg = cfg.get("exposure", {})
+    max_expo = (
+        (float(exp_cfg.get("max_exposure_usd", 0.35)) * equity_now)
+        if exp_cfg.get("set_as_fraction", True)
+        else float(exp_cfg.get("max_exposure_usd", 0.0))
+    )
+    lev = (total_notional / equity_now) if equity_now > 0 else 0.0
+
+    payload: dict[str, Any] = {
+        "now": int(now.timestamp()),
+        "equity": float(equity),
+        "db_equity": None,
+        "runtime_equity": float(equity),
+        "cash": float(cash),
+        "exposure_usd": float(exposure),
+        "breaker": breaker,
+        "regimes": dict(regimes),
+        "intents": dict(intents),
+        "positions": list(positions),
+        "strategies": dict(strategies)
+        if isinstance(strategies, dict)
+        else {"items": list(strategies) if isinstance(strategies, (list, tuple)) else {}},
+        "planned": dict(planned)
+        if isinstance(planned, dict)
+        else {"items": list(planned) if isinstance(planned, (list, tuple)) else {}},
+        "ml": dict(ml) if isinstance(ml, dict) else {},
+        "gate_reason": gate_reason,
+        "news_multiplier": news_multiplier,
+        "trades_last_24h": trades24,
+        "winrate_7d": winrate7,
+        "expectancy_7d_usd": expectancy7,
+        "risk": {
+            "kill_switch": bool(cfg.get("kill_switch", False)),
+            "breaker_daily_limit_pct": float(cfg.get("daily_loss_limit_pct", 3.0)),
+            "per_trade_risk_pct": float(cfg.get("per_trade_risk_pct", 0.5)),
+            "max_leverage": float(cfg.get("max_leverage", 1.5)),
+            "portfolio": {
+                "equity_now": equity_now,
+                "total_notional_usd": total_notional,
+                "max_exposure_usd": max_expo,
+                "leverage": lev,
+            },
+        },
+    }
+    if debug_info is not None:
+        payload["debug"] = debug_info
+    # Attach dual equity sources when available
+    try:
+        series = load_equity_series(limit=1)
+        if series:
+            payload["db_equity"] = float(series[-1][1])
+    except Exception:
+        pass
+    # runtime_equity already set to equity above
+    return JSONResponse(_sanitize(payload))
+
+
+@app.get("/pnl_today")
+def pnl_today():
+    """
+    Compute today's PnL using the equity series from persistence.
+    Returns equity_now, equity_sod, pnl_today_abs, pnl_today_pct.
+    """
+    try:
+        series = load_equity_series(limit=2880)
+        # Convert ts which may be ISO string or epoch seconds into UTC timestamps
+        xs: List[float] = []
+        ys: List[float] = []
+        for ts_val, eq in series:
+            try:
+                if isinstance(ts_val, (int, float)):
+                    xs.append(float(ts_val))
+                else:
+                    dt = datetime.fromisoformat(str(ts_val).replace("Z", "+00:00"))
+                    xs.append(dt.replace(tzinfo=timezone.utc).timestamp())
+                ys.append(float(eq))
+            except Exception:
+                continue
+        now_eq = ys[-1] if ys else 0.0
+        today_utc = datetime.now(timezone.utc).date()
+        sod = None
+        for x, y in zip(xs, ys):
+            if datetime.fromtimestamp(x, tz=timezone.utc).date() == today_utc:
+                sod = y
+                break
+        if sod is None:
+            sod = now_eq
+        pnl_abs = now_eq - sod
+        pnl_pct = (pnl_abs / sod * 100.0) if sod else 0.0
+        return {
+            "equity_now": float(now_eq),
+            "equity_sod": float(sod),
+            "pnl_today_abs": float(pnl_abs),
+            "pnl_today_pct": float(pnl_pct),
+        }
+    except Exception as e:
+        return {"equity_now": 0.0, "equity_sod": 0.0, "pnl_today_abs": 0.0, "pnl_today_pct": 0.0, "error": str(e)}
+
+
+@app.get("/risk_profile")
+def risk_profile():
+    # Use the latest equity snapshot if available; else default to 1000
+    try:
+        series = load_equity_series(limit=1)
+        eq = float(series[-1][1]) if series else 1000.0
+    except Exception:
+        eq = 1000.0
+    prof = pick_profile(eq)
+    return {
+        "equity": eq,
+        "profile": prof.name,
+        "risk_multiplier": prof.risk_multiplier,
+        "leverage_max": prof.leverage_max,
+        "risk_per_trade_pct": prof.risk_per_trade_pct,
+        "max_daily_loss_pct": prof.max_daily_loss_pct,
+        "auto_flatten_on_dll": prof.auto_flatten_on_dll,
+    }
+
+
+@app.get("/diagnostics")
+def diagnostics():
+    env = {
+        "AET_RUNTIME_DIR": os.getenv("AET_RUNTIME_DIR"),
+        "AET_DB_PATH": os.getenv("AET_DB_PATH"),
+        "SYMBOLS": os.getenv("SYMBOLS"),
+        "MODE": os.getenv("MODE"),
+        "TIMEFRAME": os.getenv("TIMEFRAME"),
+    }
+    # runtime files
+    files = []
+    if RUNTIME_DIR.exists():
+        for p in sorted(RUNTIME_DIR.glob("*_runtime.json")):
+            try:
+                st = p.stat()
+                files.append({"name": p.name, "size": st.st_size, "mtime": st.st_mtime})
+            except Exception:
+                continue
+    acct = _load_account_runtime()
+    acct_path = RUNTIME_DIR / "account_runtime.json"
+    acct_stat = None
+    if acct_path.exists():
+        try:
+            st = acct_path.stat()
+            acct_stat = {"name": acct_path.name, "size": st.st_size, "mtime": st.st_mtime}
+        except Exception:
+            pass
+    # DB info
+    db_path = str(DB_PATH.resolve())
+    db_last = None
+    try:
+        series = load_equity_series(limit=1)
+        if series:
+            db_last = float(series[-1][1])
+    except Exception:
+        pass
+    trades_24h = None
+    try:
+        con = sqlite3.connect(db_path)
+        cur = con.cursor()
+        cur.execute("SELECT COUNT(*) FROM trades WHERE datetime(entry_ts) >= datetime('now','-1 day')")
+        row = cur.fetchone()
+        trades_24h = int(row[0]) if row else 0
+        con.close()
+    except Exception:
+        pass
+    out = {
+        "env": env,
+        "runtime_dir": str(RUNTIME_DIR),
+        "account_file": acct_stat,
+        "symbol_runtime_files": files,
+        "db_path": db_path,
+        "db_last_equity": db_last,
+        "trades_last_24h_db": trades_24h,
+        "account_snapshot": acct,
+    }
+    try:
+        now_ts = int(time.time())
+        rows = fetch_recent_decisions(limit=1000)
+        out["decisions_last_24h"] = sum(1 for r in rows if int(r.get("ts", 0)) >= now_ts - 86400)
+    except Exception:
+        out["decisions_last_24h"] = None
+    return out
+
+
+@app.get("/decisions_json")
+def decisions_json(limit: int = 200):
+    try:
+        rows = fetch_recent_decisions(limit=limit)
+        return {"count": len(rows), "items": rows}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/export/decisions.csv")
+def export_decisions_csv(limit: int = 5000):
+    import csv, io
+
+    rows = fetch_recent_decisions(limit=limit)
+    buf = io.StringIO()
+    cols = (
+        list(rows[0].keys())
+        if rows
+        else [
+            "ts",
+            "symbol",
+            "strategy",
+            "regime",
+            "signal",
+            "intent",
+            "size_usd",
+            "price",
+            "ml_p_up",
+            "ml_vote",
+            "veto",
+            "reasons",
+            "planned_stop",
+            "planned_tp",
+            "run_id",
+        ]
+    )
+    w = csv.DictWriter(buf, fieldnames=cols)
+    w.writeheader()
+    for r in rows:
+        w.writerow(r)
+    return Response(content=buf.getvalue(), media_type="text/csv")
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Health
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
+@app.get("/health")
+def health():
+    return {"ok": True, "time": _now_utc().isoformat()}
+
+
+@app.get("/settings")
+def get_settings():
+    return load_settings()
+
+
+class SettingsPayload(BaseModel):
+    risk: float
+    max_pos: float
+    no_short: bool
+    circuit: bool
+
+
+@app.post("/settings")
+def post_settings(payload: SettingsPayload):
+    s = load_settings()
+    s.update(payload.model_dump())
+    save_settings(s)
+    return {"ok": True, "settings": s}
+
+
+@app.get("/trades/summary")
+def trades_summary():
+    con = sqlite3.connect(DB_PATH)
+    con.row_factory = sqlite3.Row
+    cur = con.cursor()
+    cur.execute("""
+      SELECT
+        COUNT(*) as n,
+        SUM(pnl) as pnl,
+        AVG(pnl) as avg_pnl,
+        SUM(CASE WHEN pnl>0 THEN 1 ELSE 0 END)*1.0/COUNT(*) as win_rate
+      FROM trades
+      WHERE datetime(entry_ts) >= datetime('now','-1 day')
+    """)
+    row = dict(cur.fetchone())
+    con.close()
+    return row

@@ -5,6 +5,11 @@ from .types import Signal, Side
 from .base import Strategy
 
 class DonchianBreakout(Strategy):
+    """
+    Donchian Channel Breakout strategy.
+    Long if close > recent N-bar high; short if close < recent N-bar low.
+    Stop = opposite channel boundary.
+    """
     name = "donchian_breakout"
     def __init__(self, entry_n: int = 30, exit_n: int = 12, ttl: int = 1):
         self.entry_n = entry_n

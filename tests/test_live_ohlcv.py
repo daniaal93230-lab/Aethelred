@@ -1,4 +1,4 @@
-from bot.exchange import Exchange
+from exchange import Exchange
 
 def test_live_ohlcv():
     exchange = Exchange()

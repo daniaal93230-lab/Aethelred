@@ -1,3 +1,7 @@
+# api/contracts/decisions_header.py
+# Canonical decisions header required by the test-suite.
+# Order is STRICT — do not reorder or rename.
+
 DECISIONS_HEADER = [
     "ts",
     "symbol",

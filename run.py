@@ -3,7 +3,7 @@ import sys
 from utils.logger import get_logger
 from utils.config import Settings
 from core.engine import ExecutionEngine
-from exchange.paper import PaperBroker
+from exchange.paper import PaperExchange
 
 try:
     from exchange.mexc import MexcBroker  # will be added in a later patch
@@ -15,7 +15,7 @@ log = get_logger("runner")
 
 def build_broker(mode: str):
     if mode == "paper":
-        return PaperBroker()
+        return PaperExchange()
     if mode == "live":
         if MexcBroker is None:
             raise RuntimeError("MexcBroker not available yet. Implement exchange/mexc.py")

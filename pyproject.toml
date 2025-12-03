@@ -17,12 +17,16 @@ indent-style = "space"
 docstring-code-format = true
 
 [tool.mypy]
-disable_error_code = ["index"]
+disable_error_code = ["misc", "index"]
 python_version = "3.11"
 ignore_missing_imports = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 warn_unused_configs = true
+plugins = [
+  "pydantic.mypy",
+]
+
 explicit_package_bases = true
 follow_imports = "skip"
 exclude = '(venv|.venv|build|dist|ml_models|data|bot|core|backtest_strategy\.py|brokers|ops|runner_paper\.py|runner|db|scripts|tools|tests|tests_core|tests_api)'

@@ -2,8 +2,8 @@ try:
     from exchange.paper import PaperExchange
 except Exception:
     try:
-        # older location
-        from bot.exchange import PaperExchange
+        # older location (compatibility shim) — prefer canonical `exchange`
+        from exchange import PaperExchange
     except Exception:
         PaperExchange = None
 

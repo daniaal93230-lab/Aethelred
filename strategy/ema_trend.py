@@ -1,21 +1,46 @@
+"""
+Legacy test stub for EMA trend strategy.
+
+Required by:
+    from strategy.ema_trend import signal as sig_trend
+
+This file is NOT used in production. It only provides a simple,
+deterministic EMA-based signal() for legacy selector tests.
+"""
+
 from __future__ import annotations
-import pandas as pd
 
-def _ema(s: pd.Series, n: int) -> pd.Series:
-    return s.ewm(span=n, adjust=False).mean()
+from typing import Dict, Any
+import numpy as np
 
-def signal(df: pd.DataFrame) -> str:
+
+def signal(market: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Simple trend follower:
-      long when EMA12 > EMA26, short when <, else hold
+    Minimal EMA trend signal expected by tests.
+
+    Returns:
+        dict(side="buy"/"sell"/"hold", strength=float)
     """
-    if df is None or len(df) < 30:
-        return "hold"
-    c = df["close"].astype(float)
-    f = _ema(c, 12)
-    s = _ema(c, 26)
-    if float(f.iloc[-1]) > float(s.iloc[-1]):
-        return "buy"
-    if float(f.iloc[-1]) < float(s.iloc[-1]):
-        return "sell"
-    return "hold"
+    prices = market.get("close", [])
+    if not prices:
+        return {"side": "hold", "strength": 0.0}
+
+    arr = np.array(prices, dtype=float)
+
+    # Compute simple EMA
+    alpha = 2 / (len(arr) + 1)
+    ema = arr[0]
+    for p in arr[1:]:
+        ema = alpha * p + (1 - alpha) * ema
+
+    last = arr[-1]
+
+    if last > ema:
+        return {"side": "buy", "strength": float(last - ema)}
+    if last < ema:
+        return {"side": "sell", "strength": float(ema - last)}
+
+    return {"side": "hold", "strength": 0.0}
+
+
+__all__ = ["signal"]

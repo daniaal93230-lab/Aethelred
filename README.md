@@ -2,22 +2,18 @@
 
 Trading research and paper-trading stack with simple FastAPI endpoints, risk controls, and lightweight ML.
 
+## Aethelred Trading System
+
+Strategies: RSI, Donchian, MA Crossover
+ML Gating: Optional veto model for signal filtering
+Risk: Volatility-adjusted position sizing, kill switches
+Run: `python bot/main.py --mode=paper`
+API: Uvicorn server on `/docs`
+
 ## Cleanup and structure
 
 We are consolidating to a single execution path and removing legacy, duplicate, or superseded modules.
-Run the prune script once after this patch:
-
-```bash
-python scripts/prune_legacy.py --apply
-```
-
-If you want a dry run first:
-
-```bash
-python scripts/prune_legacy.py --dry-run
-```
-
-After pruning, use the unified runner:
+After pruning legacy files, use the unified runner:
 
 ```bash
 python run.py --mode paper   # or --mode live
@@ -39,9 +35,9 @@ Then open `repo_index.json` to see files, docstrings and first lines.
 
 Short, structured summary useful for fast onboarding or prompting an assistant:
 
-- Language: Python 3.11+; main entry points in `api/` and `bot/`.
+ - Language: Python 3.11+; main entry points in `api/` and `core/`.
 - API: FastAPI app under `api/main.py` exposing health/runtime endpoints used by Visor.
-- Engine: trading engine objects live under `bot/brain.py` and `core/engine.py` (look for `account_snapshot()` and `runtime_snapshot`).
+ - Engine: trading engine objects live under `core/execution_engine.py` and `core/` modules (look for `account_snapshot()` and `runtime_snapshot`).
 - Persistence: sqlite (`data/ledger.db`) for quick dev; code also supports DB_URL env for Postgres.
 - Scripts: `tools/` contains dev helpers (start/stop scripts, diagnostics), `scripts/` contains maintenance tasks.
 - Watchdog/Visor: `tools/start_paper.ps1` launches uvicorn + watchdog + visor (streamlit) for QA runs.
@@ -49,8 +45,8 @@ Short, structured summary useful for fast onboarding or prompting an assistant:
 Recommended quick prompts for an assistant:
 
 - "Where is the FastAPI app defined?" -> `api/main.py`
-- "How does the engine expose runtime state?" -> look for `account_snapshot()` in `bot/brain.py` and `core/runtime_state` persistence.
-- "Where are dev scripts to start the API and Visor?" -> `tools/start_paper.ps1`
+- "How does the engine expose runtime state?" -> look for `account_snapshot()` in `core/execution_engine.py` and `core/runtime_state` persistence.
+ - "Where are dev scripts to start the API and Visor?" -> `tools/start_paper.ps1`
 
 ## Port / HTTP.SYS troubleshooting (dev machines)
 

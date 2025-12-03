@@ -1,79 +1,159 @@
 from __future__ import annotations
 
-from typing import Any, Optional
-from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from utils.snapshot import write_runtime_snapshot
-import time
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any
+from fastapi import Request  # ensure request type is imported
 
-
-class DemoPayload(BaseModel):
-    symbol: Optional[str] = "BTCUSDT"
-    side: Optional[str] = "long"
-    qty: Optional[float] = 0.001
-    price: Optional[float] = 100.0
+from api.deps.engine import get_engine  # injected engine instance
+from api.deps.exchange import get_paper_exchange
+from api.deps.risk import get_risk_engine
 
 
 router = APIRouter(prefix="/demo", tags=["demo"])
 
 
-@router.post("/paper_quick_run")
-def paper_quick_run(request: Request, payload: DemoPayload) -> Any:
+# ----------------------------------------------------------------------
+# Schemas
+# ----------------------------------------------------------------------
+
+
+class DemoPayload(BaseModel):
+    symbol: str = Field("BTC/USDT", description="Trading symbol")
+    side: str = Field("long", description="Direction: long/short")
+    qty: float = Field(0.001, gt=0)
+    price: Optional[float] = Field(None, description="Override market price")
+
+
+class DemoResult(BaseModel):
+    ok: bool
+    symbol: str
+    qty: float
+    price: float
+    side: str
+    executed: bool
+    meta: Dict[str, Any]
+
+
+# ----------------------------------------------------------------------
+# Helpers
+# ----------------------------------------------------------------------
+
+
+def _get_price(exchange: Any, symbol: str, override: Optional[float]) -> float:
     """
-    QA demo route.
-    If the app has a QADevEngine attached at `app.state.engine`, open a tiny in-memory demo position and write a runtime snapshot.
-    Also append a demo trade record so `/export/trades.csv` contains at least one row for acceptance tests.
+    Gets the current close price from the paper exchange,
+    unless overridden by the request.
     """
-    app = request.app
-    engine = getattr(app.state, "engine", None)
-    if engine is None:
-        return JSONResponse(
-            {"error": "QA engine not attached. Start the API with QA_DEV_ENGINE=1 or QA_MODE=1 to enable demo mode."},
-            status_code=503,
+    if override is not None:
+        return override
+
+    ohlcv = exchange.fetch_ohlcv(symbol)
+    if not ohlcv or not isinstance(ohlcv[-1], list) or len(ohlcv[-1]) < 5:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"No price available for {symbol}",
+        )
+    return float(ohlcv[-1][4])
+
+
+# ----------------------------------------------------------------------
+# Routes
+# ----------------------------------------------------------------------
+
+
+@router.post("/market", response_model=DemoResult)
+async def demo_market_order(
+    payload: DemoPayload,
+    engine: Any = Depends(get_engine),
+    exchange: Any = Depends(get_paper_exchange),
+    risk: Any = Depends(get_risk_engine),
+) -> DemoResult:
+    """
+    Simulate a simple market order using the paper exchange.
+
+    Does NOT affect production trading; safe for testing/demos.
+    """
+
+    price = _get_price(exchange, payload.symbol, payload.price)
+
+    # Risk sanity
+    if payload.qty <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Quantity must be positive.",
         )
 
-    # Extract payload values
-    symbol = payload.symbol
-    side = (payload.side or "long").lower()
-    qty = float(payload.qty or 0.0)
-    price = float(payload.price or 0.0)
+    # Paper execution
+    try:
+        result = exchange.place_order(
+            symbol=payload.symbol,
+            side=payload.side,
+            qty=payload.qty,
+            price=price,
+            order_type="market",
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Execution error: {exc}",
+        )
 
-    # Prefer the in-memory demo helper when available (opens a position)
-    if hasattr(engine, "_open_demo_position"):
+    return DemoResult(
+        ok=True,
+        symbol=payload.symbol,
+        qty=payload.qty,
+        price=price,
+        side=payload.side,
+        executed=True,
+        meta={"exchange_result": result},
+    )
+
+
+@router.get("/ping")
+async def demo_ping() -> Dict[str, Any]:
+    """Simple health check for demo subsystem."""
+    return {"ok": True, "msg": "demo online"}
+
+
+@router.get("/signal")
+async def demo_signal(request: Request, symbol: str = "BTC/USDT") -> Dict[str, Any]:
+    """
+    Return a demo signal. `test=1` query param returns legacy SMA raw string.
+    Otherwise returns typed signal from the engine/router when available.
+    """
+    testing = request.query_params.get("test") == "1"
+
+    engine = None
+    try:
+        engine = await Depends(get_engine)(request)
+    except Exception:
         try:
-            engine._open_demo_position(symbol=symbol, side=side, qty=qty, price=price)
+            engine = get_engine(request)
         except Exception:
-            pass
+            engine = None
 
-    # Also create a demo trade record so /export/trades.csv has at least one row for acceptance tests
+    exch = getattr(engine, "exchange", None) if engine is not None else None
+    if exch is None:
+        raise HTTPException(status_code=503, detail="Exchange unavailable")
+
     try:
-        now = int(time.time())
-        demo_trade = {
-            "ts_open": now - 60,
-            "ts_close": now,
-            "symbol": symbol,
-            "side": side,
-            "qty": qty,
-            "entry": price,
-            "exit": price,
-            "pnl": 0.0,
-            "pnl_pct": 0.0,
-            "fee_usd": 0.0,
-            "slippage_bps": 0.0,
-            "note": "demo",
-        }
-        if hasattr(engine, "_trades") and isinstance(getattr(engine, "_trades"), list):
-            engine._trades.append(demo_trade)
+        ohlcv = exch.fetch_ohlcv(symbol)
     except Exception:
-        pass
+        ohlcv = []
 
-    # write a runtime snapshot (engine-backed) for UI/acceptance testing
-    try:
-        write_runtime_snapshot(engine)
-    except Exception:
-        # Do not fail the endpoint if snapshot write fails; return partial info
-        return JSONResponse({"ok": True, "warning": "snapshot_write_failed"})
+    if testing:
+        from core.trade_logic import simple_moving_average_strategy
 
-    # Return a compact confirmation
-    return {"ok": True, "symbol": symbol, "qty": qty, "price": price}
+        raw = simple_moving_average_strategy(ohlcv)
+        return {"signal": raw}
+
+    strategos = getattr(engine, "_strategos", None) if engine is not None else None
+    if strategos is None:
+        from core.trade_logic import simple_moving_average_strategy
+
+        raw = simple_moving_average_strategy(ohlcv)
+        return {"signal": raw}
+
+    typed = strategos.route(ohlcv)
+    return {"signal": typed.side.value.lower(), "strength": typed.strength}

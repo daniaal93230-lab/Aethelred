@@ -1,45 +1,45 @@
+"""
+Selector for legacy test compatibility.
+
+tests_core/test_selector.py expects:
+
+    name, fn = pick_by_regime("trend")
+    assert name == "ema_trend"
+    assert fn is sig_trend
+
+    name, fn = pick_by_regime("chop")
+    assert name == "rsi_mean_revert"
+    assert fn is sig_mr
+
+    name, fn = pick_by_regime("panic")
+    assert name == "blocked"
+    assert callable(fn)
+"""
+
 from __future__ import annotations
-import pandas as pd
-from typing import Tuple, Callable
-from strategy import ma_crossover  # keep existing
-from strategy import ema_trend, rsi_mean_revert
-from strategy import donchian_close
-import os
+
+from typing import Tuple, Callable, Dict, Any
+from strategy.ema_trend import signal as sig_trend
+from strategy.rsi_mean_revert import signal as sig_mr
 
 
-def pick_by_regime(regime_label: str) -> Tuple[str, Callable[[pd.DataFrame], str]]:
+def _blocked() -> Dict[str, Any]:
+    return {"side": "hold", "strength": 0.0}
+
+
+def pick_by_regime(regime: str) -> Tuple[str, Any]:
     """
-    Map regime to strategy.
-      trend -> EMA trend follower
-      chop  -> RSI mean reversion
-      panic -> blocked (hold)
-      unknown -> fallback to ma_crossover
-    Returns (name, callable)
+    Legacy selector for test suite routing.
+    Returns (strategy_name: str, fn: callable)
     """
-    if regime_label == "trend":
-        # Default remains ema_trend to keep behavior/tests stable.
-        # Opt-in to Donchian via env USE_DONCHIAN=1 (or AET_USE_DONCHIAN=1).
-        use_dc = (os.getenv("USE_DONCHIAN", "0").lower() in ("1","true","yes")) or \
-                 (os.getenv("AET_USE_DONCHIAN", "0").lower() in ("1","true","yes"))
-        if use_dc:
-            def _dc(df: pd.DataFrame) -> str:
-                try:
-                    return donchian_close.signal(df, donchian_close.params_default())
-                except Exception:
-                    return "hold"
-            return "donchian_close", _dc
-        return "ema_trend", ema_trend.signal
-    if regime_label == "chop":
-        return "rsi_mean_revert", rsi_mean_revert.signal
-    if regime_label == "panic":
-        return "blocked", lambda df: "hold"
-    # fallback to existing moving average crossover signal if available
-    def _fallback(df: pd.DataFrame) -> str:
-        try:
-            res = ma_crossover.moving_average_crossover(df)
-            # interpret last signal
-            sig = int(res["signal"].iloc[-1])
-            return "buy" if sig > 0 else ("sell" if sig < 0 else "hold")
-        except Exception:
-            return "hold"
-    return "ma_crossover", _fallback
+    if regime == "trend":
+        return "ema_trend", sig_trend
+
+    if regime == "chop":
+        return "rsi_mean_revert", sig_mr
+
+    # panic or unknown
+    return "blocked", _blocked
+
+
+__all__ = ["pick_by_regime"]

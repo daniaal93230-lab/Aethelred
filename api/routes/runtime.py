@@ -2,14 +2,46 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 import os
+from utils.logger import logger
 from core.runtime_state import RUNTIME_DIR
+from core.runtime_state import kill_is_on, kill_on, kill_off
+from core.runtime_state import read_events
+from core.runtime_state import prometheus_format
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
+
+
+@router.post("/start")
+async def start_all(request: Request) -> Dict[str, Any]:
+    multi = getattr(request.app.state, "multi_orch", None)
+    if multi is None:
+        raise HTTPException(status_code=503, detail="multi orchestrator not configured")
+    logger.info("runtime_start_request")
+    await multi.start_all()
+    return {"status": "started", "symbols": multi.symbols}
+
+
+@router.post("/stop")
+async def stop_all(request: Request) -> Dict[str, Any]:
+    multi = getattr(request.app.state, "multi_orch", None)
+    if multi is None:
+        raise HTTPException(status_code=503, detail="multi orchestrator not configured")
+    await multi.stop_all()
+    return {"status": "stopped", "symbols": multi.symbols}
+
+
+@router.get("/status")
+async def status(request: Request) -> Dict[str, Any]:
+    multi = getattr(request.app.state, "multi_orch", None)
+    if multi:
+        # multi.status() is dynamically typed; cast to the declared return type
+        return cast(Dict[str, Any], multi.status())
+    return {}
 
 
 def _qa_like() -> bool:
@@ -284,10 +316,46 @@ def _build_snapshot(engine: Any) -> Dict[str, Any]:
     return out
 
 
+# ------------------------------------------------------------
+# Batch 6D — Kill Switch Endpoints
+# ------------------------------------------------------------
+
+
+@router.get("/runtime/kill")
+def get_kill_state() -> Dict[str, Any]:
+    """Return kill switch state."""
+    return {"kill": kill_is_on()}
+
+
+@router.post("/runtime/kill")
+def activate_kill() -> Dict[str, Any]:
+    """Activate global kill-switch."""
+    kill_on()
+    return {"kill": True}
+
+
+@router.post("/runtime/kill/off")
+def deactivate_kill() -> Dict[str, Any]:
+    """Deactivate global kill-switch."""
+    kill_off()
+    return {"kill": False}
+
+
 @router.get("/runtime/account_runtime.json")
-def account_runtime(request: Request) -> Dict[str, Any]:
+def account_runtime(request: Request, symbol: str | None = None) -> Dict[str, Any]:
     app = request.app
-    engine = getattr(app.state, "engine", None)
+    engines = getattr(app.state, "engine", None)
+
+    # Multi-engine case (Batch 6E)
+    if isinstance(engines, dict):
+        if not symbol:
+            raise HTTPException(status_code=400, detail="symbol is required")
+        engine = engines.get(symbol)
+        if engine is None:
+            raise HTTPException(status_code=404, detail=f"symbol {symbol} not found")
+    else:
+        engine = engines
+
     if engine is None:
         raise HTTPException(status_code=503, detail="engine not attached")
 
@@ -303,12 +371,36 @@ def account_runtime(request: Request) -> Dict[str, Any]:
     getter = getattr(engine, "account_snapshot", None) or getattr(engine, "get_runtime", None)
     try:
         maybe = getter() if callable(getter) else None
-        eq_candidates.append(_dict_list(maybe, "equity"))
+        # If the callable snapshot exposes a scalar 'equity_now' (common for QA engines), use it preferentially
+        if isinstance(maybe, dict) and maybe.get("equity_now") is not None:
+            ts_val = maybe.get("ts")
+            if ts_val is None:
+                from datetime import datetime
+
+                ts_val = int(datetime.now(timezone.utc).timestamp())
+            equity_series = [{"ts": ts_val, "equity": _safe_float(maybe.get("equity_now"))}]
+        else:
+            eq_candidates.append(_dict_list(maybe, "equity"))
     except Exception:
         pass
     eq_first = _first_non_empty_list(*eq_candidates)
     if isinstance(eq_first, list):
         equity_series = eq_first
+
+    # If the callable snapshot exposes a scalar 'equity_now' (QA engines often do), prefer that
+    if not equity_series:
+        try:
+            maybe2 = getter() if callable(getter) else None
+            if isinstance(maybe2, dict) and maybe2.get("equity_now") is not None:
+                # prefer explicit ts if available, else use now()
+                ts_val = maybe2.get("ts")
+                if ts_val is None:
+                    from datetime import datetime
+
+                    ts_val = int(datetime.now(timezone.utc).timestamp())
+                equity_series = [{"ts": ts_val, "equity": _safe_float(maybe2.get("equity_now"))}]
+        except Exception:
+            pass
 
     # open positions with generous fallbacks
     positions: List[Dict[str, Any]] = []
@@ -352,18 +444,67 @@ def account_runtime(request: Request) -> Dict[str, Any]:
 
     # Last-resort: check persisted runtime file under the configured RUNTIME_DIR
     try:
-        if not equity_series or not positions:
-            snap_path = RUNTIME_DIR / "account_runtime.json"
-            if snap_path.exists():
-                raw = json.loads(snap_path.read_text(encoding="utf-8"))
+        snap_path = RUNTIME_DIR / "account_runtime.json"
+        disk = None
+        if snap_path.exists():
+            try:
+                disk = json.loads(snap_path.read_text(encoding="utf-8"))
+            except Exception:
+                disk = None
+
+        # If disk snapshot exists, compare timestamps and prefer disk if it's newer
+        if disk:
+            # parse disk ts (written_at_iso preferred, fallback to ts/heartbeat_ts)
+            disk_ts = None
+            for k in ("written_at_iso", "heartbeat_ts", "ts"):
+                v = disk.get(k)
+                if isinstance(v, str):
+                    try:
+                        disk_ts = datetime.fromisoformat(v)
+                        break
+                    except Exception:
+                        try:
+                            # maybe epoch seconds
+                            disk_ts = datetime.fromtimestamp(float(v), timezone.utc)
+                            break
+                        except Exception:
+                            disk_ts = None
+
+            # derive in-proc timestamp if available
+            inproc_ts = None
+            try:
+                # prefer getter-provided ts on the callable snapshot
+                getter = getattr(engine, "account_snapshot", None) or getattr(engine, "get_runtime", None)
+                maybe = getter() if callable(getter) else None
+                if isinstance(maybe, dict) and maybe.get("ts") is not None:
+                    ts_val = maybe.get("ts")
+                    try:
+                        if isinstance(ts_val, (int, float)):
+                            inproc_ts = datetime.fromtimestamp(float(ts_val), timezone.utc)
+                        else:
+                            inproc_ts = datetime.fromisoformat(str(ts_val))
+                    except Exception:
+                        inproc_ts = None
+            except Exception:
+                inproc_ts = None
+
+            # Choose disk when inproc is empty OR disk_ts is newer than inproc_ts
+            prefer_disk = False
+            if not equity_series or not positions:
+                prefer_disk = True
+            elif disk_ts and inproc_ts and disk_ts > inproc_ts:
+                prefer_disk = True
+
+            if prefer_disk:
                 if not equity_series:
-                    if isinstance(raw.get("equity"), list):
-                        equity_series = raw.get("equity")
-                    elif raw.get("equity_now") is not None:
-                        equity_series = [{"ts": raw.get("ts"), "equity": _safe_float(raw.get("equity_now"))}]
-                if not positions and isinstance(raw.get("positions"), list):
-                    positions = raw.get("positions")
+                    if isinstance(disk.get("equity"), list):
+                        equity_series = disk.get("equity")
+                    elif disk.get("equity_now") is not None:
+                        equity_series = [{"ts": disk.get("ts"), "equity": _safe_float(disk.get("equity_now"))}]
+                if not positions and isinstance(disk.get("positions"), list):
+                    positions = disk.get("positions")
     except Exception:
+        # don't let snapshot read errors break the endpoint
         pass
 
     return {
@@ -422,3 +563,200 @@ def runtime_inspect_env() -> JSONResponse:
     keys = ["MODE", "QA_DEV_ENGINE", "SAFE_FLATTEN_ON_START"]
     env = {k: os.getenv(k) for k in keys}
     return JSONResponse({"env": env, "qa_like": _qa_like()})
+
+
+# ------------------------------------------------------------
+# Batch 7 — Telemetry endpoint
+# ------------------------------------------------------------
+@router.get("/telemetry")
+def runtime_telemetry(request: Request) -> Dict[str, Any]:
+    """
+    Unified telemetry for Visor dashboards.
+    Includes:
+      - recent events
+      - orchestrator metrics
+      - per-symbol engine status
+      - kill status
+    """
+    services = getattr(request.app.state, "services", None)
+    orch = getattr(services, "engine_orchestrator", None) if services else None
+
+    if orch is None:
+        return {"kill": kill_is_on(), "events": read_events(), "orchestrator": None}
+
+    return {
+        "kill": kill_is_on(),
+        "events": read_events(),
+        "orchestrator": orch.metrics if hasattr(orch, "metrics") else {},
+        "symbols": {
+            sym: {
+                "last_signal": getattr(engine, "last_signal", None),
+                "last_regime": getattr(engine, "last_regime", None),
+                # Risk v2 telemetry (Phase 3.G)
+                "risk_v2_enabled": getattr(engine, "risk_v2_enabled", False),
+                "drawdown": float(getattr(engine, "current_drawdown", 0)),
+                "max_equity_seen": float(getattr(engine, "max_equity_seen", 0)),
+                "loss_streak": int(getattr(engine, "_loss_streak", 0)),
+                "risk_off": bool(getattr(engine, "risk_off", False)),
+                "global_risk_off": bool(getattr(engine, "global_risk_off", False)),
+                "per_symbol_limit": float(getattr(engine, "per_symbol_exposure_limit", 0)),
+                "portfolio_limit": float(getattr(engine, "global_portfolio_limit", 0)),
+            }
+            for sym, engine in getattr(orch, "engines", {}).items()
+        },
+    }
+
+
+@router.post("/runtime/pause")
+def runtime_pause(request: Request) -> Dict[str, Any]:
+    """Pause orchestrator processing (skip per-symbol cycles)."""
+    services = getattr(request.app.state, "services", None)
+    orch = getattr(services, "engine_orchestrator", None) if services else None
+    if orch is None:
+        raise HTTPException(status_code=503, detail="orchestrator not available")
+    try:
+        orch.is_paused = True
+    except Exception:
+        raise HTTPException(status_code=500, detail="failed to pause orchestrator")
+    return {"paused": True}
+
+
+@router.post("/runtime/resume")
+def runtime_resume(request: Request) -> Dict[str, Any]:
+    """Resume orchestrator processing."""
+    services = getattr(request.app.state, "services", None)
+    orch = getattr(services, "engine_orchestrator", None) if services else None
+    if orch is None:
+        raise HTTPException(status_code=503, detail="orchestrator not available")
+    try:
+        orch.is_paused = False
+    except Exception:
+        raise HTTPException(status_code=500, detail="failed to resume orchestrator")
+    return {"paused": False}
+
+
+# ------------------------------------------------------------------
+# Multi-orchestrator control (Batch 1)
+# ------------------------------------------------------------------
+
+
+@router.post("/runtime/start")
+async def runtime_start(request: Request) -> Dict[str, Any]:
+    multi = getattr(request.app.state, "multi_orch", None)
+    if multi is None:
+        raise HTTPException(status_code=503, detail="multi orchestrator not configured")
+    logger.info("runtime_start_request")
+    await multi.start_all()
+    return {"status": "started", "symbols": multi.symbols}
+
+
+@router.post("/runtime/stop")
+async def runtime_stop(request: Request) -> Dict[str, Any]:
+    multi = getattr(request.app.state, "multi_orch", None)
+    if multi is None:
+        raise HTTPException(status_code=503, detail="multi orchestrator not configured")
+    logger.info("runtime_stop_request")
+    await multi.stop_all()
+    return {"status": "stopped", "symbols": multi.symbols}
+
+
+@router.get("/runtime/status")
+async def runtime_status(request: Request) -> Dict[str, Any]:
+    multi = getattr(request.app.state, "multi_orch", None)
+    if multi is None:
+        raise HTTPException(status_code=503, detail="multi orchestrator not configured")
+    # Build an enriched status payload that includes per-engine risk telemetry.
+    out: Dict[str, Any] = {}
+    try:
+        for sym, orch in getattr(multi, "_orchs", {}).items():
+            eng = getattr(orch, "engine", None)
+            out[sym] = {
+                "paused": getattr(orch, "is_paused", False),
+                "last_signal": str(getattr(eng, "last_signal", None)),
+                "last_regime": str(getattr(eng, "last_regime", None)),
+                # Risk v2 telemetry
+                "risk_v2_enabled": getattr(eng, "risk_v2_enabled", False),
+                "drawdown": float(getattr(eng, "current_drawdown", 0)),
+                "max_equity_seen": float(getattr(eng, "max_equity_seen", 0)),
+                "loss_streak": int(getattr(eng, "_loss_streak", 0)),
+                "risk_off": bool(getattr(eng, "risk_off", False)),
+                "global_risk_off": bool(getattr(eng, "global_risk_off", False)),
+                "per_symbol_limit": float(getattr(eng, "per_symbol_exposure_limit", 0)),
+                "portfolio_limit": float(getattr(eng, "global_portfolio_limit", 0)),
+            }
+    except Exception:
+        # Fallback to the original status map when enrichment fails
+        st = multi.status()
+        logger.info("runtime_status_request", extra={"status": st})
+        return cast(Dict[str, Any], st)
+
+    logger.info("runtime_status_request", extra={"status": out})
+    return out
+
+
+@router.get("/runtime/sentiment")
+def runtime_sentiment() -> Dict[str, Any]:
+    from core.runtime_state import read_news_multiplier
+
+    mul = read_news_multiplier()
+    return {"sentiment_multiplier": mul}
+
+
+# ------------------------------------------------------------
+# Batch 8 — Prometheus /metrics
+# ------------------------------------------------------------
+@router.get("/metrics")
+def prometheus_metrics(request: Request) -> Response:
+    """
+    Batch 8 — Prometheus-compatible metrics exporter.
+    scrapes:
+      - orchestrator metrics
+      - per-symbol engine metrics
+      - kill switch
+    """
+    # Prefer a proper Prometheus registry when available. This module is
+    # optional so fall back to the existing flat-dict exporter.
+    from api.routes import metrics as _metrics
+
+    text = ""
+    try:
+        # Ensure registry and families exist so we can set runtime values like uptime
+        try:
+            _metrics.get_registry()
+        except Exception:
+            pass
+
+        # set uptime gauge if present
+        try:
+            import time
+
+            start_ts = getattr(request.app.state, "start_ts", None)
+            if start_ts is not None:
+                try:
+                    gauge = getattr(_metrics, "aet_uptime_seconds_total", None)
+                    if gauge is not None and hasattr(gauge, "set"):
+                        try:
+                            gauge.set(float(time.time() - float(start_ts)))
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        text = _metrics.generate_metrics_text()
+    except Exception:
+        text = ""
+
+    if text:
+        return Response(text, media_type="text/plain")
+
+    services = getattr(request.app.state, "services", None)
+    orch = getattr(services, "engine_orchestrator", None) if services else None
+
+    if orch is None:
+        return Response("kill_switch 1\n", media_type="text/plain")
+
+    metrics = orch.prometheus_metrics()
+    txt = prometheus_format(metrics)
+    return Response(txt, media_type="text/plain")

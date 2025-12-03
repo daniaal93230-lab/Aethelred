@@ -44,11 +44,8 @@ jobs:
           ruff check api tests_api || true
           # set to `|| exit 1` when you want hard failure on lint issues
 
-      - name: Typecheck - mypy
-        run: |
-          # Only typecheck the api package here; running mypy on tests_api causes
-          # a failure when that directory isn't treated as a proper module by mypy
-          mypy api
+      - name: Type Check - mypy
+        run: mypy --strict .
 
       - name: Unit and API tests
         env:

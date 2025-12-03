@@ -31,10 +31,10 @@ Expected runtime/account_runtime.json shape (robust to missing keys):
 
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import pandas as pd
-import requests
+import requests  # type: ignore[import-untyped]
 import streamlit as st
 
 
@@ -51,7 +51,8 @@ def fetch_json(url: str, timeout: float = TIMEOUT) -> Optional[Dict[str, Any]]:
     try:
         r = requests.get(url, timeout=timeout)
         r.raise_for_status()
-        return r.json()
+        # r.json() is untyped; cast to the declared return type to satisfy strict mypy
+        return cast(Optional[Dict[str, Any]], r.json())
     except Exception:
         return None
 

@@ -1,5 +1,14 @@
+"""Compatibility shim for legacy ``risk.engine``.
+
+Expose ``RiskEngine`` from ``core.risk`` when present, otherwise provide a
+minimal stub so imports don't fail during tests.
+"""
+
+from typing import Any
+
+__all__ = ["RiskEngine"]
 from dataclasses import dataclass
-from typing import Dict, Any
+from typing import Dict
 
 from .taxonomy import Reason
 from .state import RiskKV
@@ -15,13 +24,13 @@ class RiskDecision:
 
 
 class RiskEngine:
-    def __init__(self):
+    def __init__(self) -> None:
         self.cfg = load_risk_cfg()
         if (self.cfg.get("reload", {}) or {}).get("enabled", False):
             on_risk_cfg_change(self._reload)
         self.kv = RiskKV()
 
-    def _reload(self):
+    def _reload(self) -> None:
         self.cfg = load_risk_cfg()
 
     def status(self) -> Dict[str, Any]:
@@ -32,11 +41,11 @@ class RiskEngine:
             "config_version": self.cfg.get("version") or self.cfg.get("meta", {}).get("version", 1),
         }
 
-    def set_kill_switch(self, on: bool):
+    def set_kill_switch(self, on: bool) -> None:
         self.kv.set("kill_switch", "on" if on else "off")
         # audit hook could be added here
 
-    def reset_breakers(self):
+    def reset_breakers(self) -> None:
         self.kv.set("daily_loss_breaker", "off")
 
     def pre_trade_checks(
@@ -87,7 +96,7 @@ class RiskEngine:
 
         return RiskDecision(True, "ok", {"equity": equity})
 
-    def post_trade_update(self, pnl_day_pct: float):
+    def post_trade_update(self, pnl_day_pct: float) -> None:
         limits = self.cfg.get("limits", {})
         if pnl_day_pct <= -abs(float(limits.get("daily_loss_limit_pct", 4.0))) - 1e-9:
             self.kv.set("daily_loss_breaker", "on")
